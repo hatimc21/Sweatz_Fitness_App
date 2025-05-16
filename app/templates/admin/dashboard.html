@@ -1,0 +1,314 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Admin Dashboard - Sweatz{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card primary">
+        <div class="stat-icon">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_users }}</div>
+        <div class="stat-label">Total Users</div>
+    </div>
+    
+    <div class="stat-card secondary">
+        <div class="stat-icon">
+            <i class="fas fa-user-check"></i>
+        </div>
+        <div class="stat-value">{{ stats.active_users }}</div>
+        <div class="stat-label">Active Users</div>
+    </div>
+    
+    <div class="stat-card success">
+        <div class="stat-icon">
+            <i class="fas fa-user-plus"></i>
+        </div>
+        <div class="stat-value">{{ stats.new_users_week }}</div>
+        <div class="stat-label">New Users (7 days)</div>
+    </div>
+    
+    <div class="stat-card warning">
+        <div class="stat-icon">
+            <i class="fas fa-dumbbell"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_workouts }}</div>
+        <div class="stat-label">Total Workouts</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span>User Registration Trend (Last 30 Days)</span>
+    </div>
+    <div class="chart-container">
+        <canvas id="userRegistrationChart"></canvas>
+    </div>
+</div>
+
+<div class="row" style="display: flex; gap: 20px;">
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <span>Subscription Distribution</span>
+        </div>
+        <div>
+            {% if subscription_stats %}
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="subscriptionChart"></canvas>
+                </div>
+                <div style="margin-top: 20px;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subscription Tier</th>
+                                <th>Users</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in subscription_stats %}
+                            <tr>
+                                <td>{{ item._id }}</td>
+                                <td>{{ item.count }}</td>
+                                <td>{{ "%.1f"|format(item.count / stats.total_users * 100) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>No subscription data available.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <span>Recent User Registrations</span>
+            <a href="{{ url_for('admin.users') }}" class="btn btn-primary btn-sm" style="padding: 5px 10px; font-size: 0.8rem;">View All</a>
+        </div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Subscription</th>
+                        <th>Registered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in recent_users %}
+                    <tr>
+                        <td>
+                            <div class="user-profile">
+                                <div class="user-avatar">{{ user.username[0]|upper }}</div>
+                                <div class="user-info">
+                                    <span class="user-name">{{ user.username }}</span>
+                                    <span class="user-email">{{ user.email }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if user.subscription_tier == 'admin' %}badge-danger
+                                {% elif user.subscription_tier == 'premium' %}badge-success
+                                {% else %}badge-secondary{% endif %}">
+                                {{ user.subscription_tier }}
+                            </span>
+                        </td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data for charts -->
+<div id="chart-data" style="display: none;" 
+     data-stats-url="{{ url_for('admin.user_stats_api') }}"
+     data-has-subscription-stats="{{ 'true' if subscription_stats else 'false' }}">
+    {% if subscription_stats %}
+    <div id="subscription-data">
+        {% for item in subscription_stats %}
+        <div class="subscription-item"
+             data-label="{{ item._id }}"
+             data-count="{{ item.count }}"
+             data-percentage="{{ (item.count / stats.total_users * 100)|float }}">
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get data from hidden elements
+    var chartDataElement = document.getElementById('chart-data');
+    var statsUrl = chartDataElement.getAttribute('data-stats-url');
+    var hasSubscriptionStats = chartDataElement.getAttribute('data-has-subscription-stats') === 'true';
+    
+    // Create user registration chart
+    createUserRegistrationChart(statsUrl);
+    
+    // Create subscription chart if data is available
+    if (hasSubscriptionStats) {
+        createSubscriptionChart();
+    }
+});
+
+// Function to create user registration chart
+function createUserRegistrationChart(statsUrl) {
+    fetch(statsUrl)
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            var ctx = document.getElementById('userRegistrationChart').getContext('2d');
+            
+            var chartLabels = [];
+            var chartData = [];
+            
+            for (var i = 0; i < data.length; i++) {
+                chartLabels.push(data[i].date);
+                chartData.push(data[i].count);
+            }
+            
+            var chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'New Users',
+                        data: chartData,
+                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointBackgroundColor: 'rgba(76, 175, 80, 1)',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            bodyFont: {
+                                size: 14
+                            },
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    return 'New users: ' + context.raw;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(function(error) {
+            console.error('Error loading user stats:', error);
+        });
+}
+
+// Function to create subscription chart
+function createSubscriptionChart() {
+    // Get data from hidden elements
+    var subscriptionItems = document.querySelectorAll('#subscription-data .subscription-item');
+    
+    if (subscriptionItems.length === 0) {
+        return;
+    }
+    
+    var subscriptionData = [];
+    var chartLabels = [];
+    var chartCounts = [];
+    var chartColors = [];
+    
+    // Define colors for subscription tiers
+    var colorMap = {
+        'free': 'rgba(108, 117, 125, 0.8)',
+        'premium': 'rgba(40, 167, 69, 0.8)',
+        'admin': 'rgba(220, 53, 69, 0.8)',
+        'family': 'rgba(33, 150, 243, 0.8)'
+    };
+    
+    // Extract data from DOM elements
+    for (var i = 0; i < subscriptionItems.length; i++) {
+        var item = subscriptionItems[i];
+        var label = item.getAttribute('data-label');
+        var count = parseInt(item.getAttribute('data-count'), 10);
+        var percentage = parseFloat(item.getAttribute('data-percentage'));
+        
+        subscriptionData.push({
+            label: label,
+            count: count,
+            percentage: percentage
+        });
+        
+        chartLabels.push(label);
+        chartCounts.push(count);
+        chartColors.push(colorMap[label] || 'rgba(255, 193, 7, 0.8)');
+    }
+    
+    // Create chart
+    var subscriptionCtx = document.getElementById('subscriptionChart').getContext('2d');
+    var subscriptionChart = new Chart(subscriptionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                data: chartCounts,
+                backgroundColor: chartColors,
+                borderWidth: 1,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            var item = subscriptionData[context.dataIndex];
+                            return item.label + ': ' + item.count + ' (' + item.percentage.toFixed(1) + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

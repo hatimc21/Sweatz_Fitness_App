@@ -1,0 +1,78 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Manage Exercises - Sweatz Admin{% endblock %}
+
+{% block page_title %}Manage Exercises{% endblock %}
+
+{% block actions %}
+<div>
+    <a href="{{ url_for('admin.add_exercise') }}" class="btn btn-primary">Add New Exercise</a>
+    
+    <form action="{{ url_for('admin.exercises') }}" method="GET" style="display: inline-block; margin-left: 10px;">
+        <select name="muscle_group" class="form-control" style="display: inline-block; width: auto;">
+            <option value="">All Muscle Groups</option>
+            {% for group in muscle_groups %}
+            <option value="{{ group }}" {% if request.args.get('muscle_group') == group %}selected{% endif %}>{{ group }}</option>
+            {% endfor %}
+        </select>
+        
+        <button type="submit" class="btn btn-primary" style="margin-left: 5px;">Filter</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <span>Exercises ({{ total_exercises }})</span>
+    </div>
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Muscle Group</th>
+                    <th>Difficulty</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exercise in exercises %}
+                <tr>
+                    <td>{{ exercise.name }}</td>
+                    <td>
+                        <span class="badge badge-secondary">{{ exercise.muscle_group }}</span>
+                    </td>
+                    <td>
+                        {% if exercise.difficulty == 'beginner' %}
+                        <span class="badge badge-success">Beginner</span>
+                        {% elif exercise.difficulty == 'intermediate' %}
+                        <span class="badge badge-warning">Intermediate</span>
+                        {% elif exercise.difficulty == 'advanced' %}
+                        <span class="badge badge-danger">Advanced</span>
+                        {% else %}
+                        <span class="badge badge-secondary">{{ exercise.difficulty }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="#" class="btn btn-sm btn-primary" style="padding: 3px 8px; font-size: 0.8rem;">Edit</a>
+                        <a href="#" class="btn btn-sm btn-danger" style="padding: 3px 8px; font-size: 0.8rem;">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% for i in range(1, total_pages + 1) %}
+        <a href="{{ url_for('admin.exercises', page=i, muscle_group=request.args.get('muscle_group')) }}" 
+           class="{% if i == page %}active{% endif %}">
+            {{ i }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

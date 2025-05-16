@@ -1,0 +1,92 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Manage Users - Sweatz Admin{% endblock %}
+
+{% block page_title %}Manage Users{% endblock %}
+
+{% block actions %}
+<div>
+    <form action="{{ url_for('admin.users') }}" method="GET" style="display: flex; gap: 10px;">
+        <select name="subscription" class="form-control" style="width: auto;">
+            <option value="">All Subscriptions</option>
+            <option value="free" {% if request.args.get('subscription') == 'free' %}selected{% endif %}>Free</option>
+            <option value="premium" {% if request.args.get('subscription') == 'premium' %}selected{% endif %}>Premium</option>
+            <option value="admin" {% if request.args.get('subscription') == 'admin' %}selected{% endif %}>Admin</option>
+        </select>
+        
+        <select name="status" class="form-control" style="width: auto;">
+            <option value="">All Status</option>
+            <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+        
+        <button type="submit" class="btn btn-primary" style="flex-shrink: 0;">Filter</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <span>Users ({{ total_users }})</span>
+    </div>
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Joined</th>
+                    <th>Last Login</th>
+                    <th>Status</th>
+                    <th>Subscription</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <div class="user-profile">
+                            <div class="user-avatar">{{ user.username[0]|upper }}</div>
+                            <div class="user-info">
+                                <span class="user-name">{{ user.first_name }} {{ user.last_name }}</span>
+                                <span class="user-email">{{ user.email }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
+                    <td>
+                        <span class="badge {% if user.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                            {{ 'Active' if user.is_active else 'Inactive' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge 
+                            {% if user.subscription_tier == 'admin' %}badge-danger
+                            {% elif user.subscription_tier == 'premium' %}badge-success
+                            {% else %}badge-secondary{% endif %}">
+                            {{ user.subscription_tier }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin.user_detail', user_id=user._id) }}" class="btn btn-sm btn-primary" style="padding: 3px 8px; font-size: 0.8rem;">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% for i in range(1, total_pages + 1) %}
+        <a href="{{ url_for('admin.users', page=i, subscription=request.args.get('subscription'), status=request.args.get('status')) }}" 
+           class="{% if i == page %}active{% endif %}">
+            {{ i }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,184 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}User Details - Sweatz Admin{% endblock %}
+
+{% block page_title %}User Details{% endblock %}
+
+{% block actions %}
+<div>
+    <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">Back to Users</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <span>User Profile</span>
+        <span class="badge {% if user.is_active %}badge-success{% else %}badge-danger{% endif %}">
+            {{ 'Active' if user.is_active else 'Inactive' }}
+        </span>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        <div style="flex: 1; min-width: 300px;">
+            <form action="{{ url_for('admin.update_user', user_id=user._id) }}" method="POST">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" class="form-control" value="{{ user.username }}" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="first_name">First Name</label>
+                    <input type="text" id="first_name" name="first_name" class="form-control" value="{{ user.first_name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input type="text" id="last_name" name="last_name" class="form-control" value="{{ user.last_name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="subscription_tier">Subscription</label>
+                    <select id="subscription_tier" name="subscription_tier" class="form-control">
+                        <option value="free" {% if user.subscription_tier == 'free' %}selected{% endif %}>Free</option>
+                        <option value="premium" {% if user.subscription_tier == 'premium' %}selected{% endif %}>Premium</option>
+                        <option value="family" {% if user.subscription_tier == 'family' %}selected{% endif %}>Family</option>
+                        <option value="admin" {% if user.subscription_tier == 'admin' %}selected{% endif %}>Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Role</label>
+                    <select id="role" name="role" class="form-control">
+                        <option value="user" {% if user.role == 'user' %}selected{% endif %}>Regular User</option>
+                        <option value="trainer" {% if user.role == 'trainer' %}selected{% endif %}>Trainer</option>
+                        <option value="gym_owner" {% if user.role == 'gym_owner' %}selected{% endif %}>Gym Owner</option>
+                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrator</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="is_active">Status</label>
+                    <select id="is_active" name="is_active" class="form-control">
+                        <option value="true" {% if user.is_active %}selected{% endif %}>Active</option>
+                        <option value="false" {% if not user.is_active %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Account Created</label>
+                    <input type="text" class="form-control" value="{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Last Login</label>
+                    <input type="text" class="form-control" value="{{ user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'Never' }}" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Update User</button>
+                </div>
+            </form>
+        </div>
+        
+        <div style="flex: 1; min-width: 300px;">
+            <div class="tabs">
+                <div class="tab-item active" data-tab="workout-tab">Workouts</div>
+                <div class="tab-item" data-tab="body-tab">Body Logs</div>
+            </div>
+            
+            <div id="workout-tab" class="tab-content">
+                <h3>Recent Workouts</h3>
+                {% if workouts %}
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for workout in workouts %}
+                            <tr>
+                                <td>{{ workout.date.strftime('%Y-%m-%d') if workout.date else 'N/A' }}</td>
+                                <td>{{ workout.name }}</td>
+                                <td>
+                                    <span class="badge {% if workout.completed %}badge-success{% else %}badge-secondary{% endif %}">
+                                        {{ 'Completed' if workout.completed else 'Planned' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p>No workouts recorded.</p>
+                {% endif %}
+            </div>
+            
+            <div id="body-tab" class="tab-content" style="display: none;">
+                <h3>Recent Body Logs</h3>
+                {% if body_logs %}
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Weight</th>
+                                <th>Other Measurements</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in body_logs %}
+                            <tr>
+                                <td>{{ log.date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ log.weight }} {{ log.weight_unit|default('kg') }}</td>
+                                <td>
+                                    {% if log.waist %}Waist: {{ log.waist }}cm{% endif %}
+                                    {% if log.chest %}, Chest: {{ log.chest }}cm{% endif %}
+                                    {% if log.arms %}, Arms: {{ log.arms }}cm{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p>No body measurements recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tabs functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabItems = document.querySelectorAll('.tab-item');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Update active tab
+                tabItems.forEach(tab => tab.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show corresponding content
+                const tabId = this.getAttribute('data-tab');
+                tabContents.forEach(content => {
+                    content.style.display = content.id === tabId ? 'block' : 'none';
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

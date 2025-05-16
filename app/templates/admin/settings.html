@@ -1,0 +1,136 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}System Settings - Sweatz Admin{% endblock %}
+
+{% block page_title %}System Settings{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <span>Application Settings</span>
+    </div>
+    <div>
+        <form action="{{ url_for('admin.update_settings') }}" method="POST">
+            <div class="form-group">
+                <label for="maintenance_mode">Maintenance Mode</label>
+                <select id="maintenance_mode" name="maintenance_mode" class="form-control">
+                    <option value="false" {% if not settings.maintenance_mode %}selected{% endif %}>Off</option>
+                    <option value="true" {% if settings.maintenance_mode %}selected{% endif %}>On</option>
+                </select>
+                <small class="form-text text-muted">When maintenance mode is on, only administrators can access the app.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="allow_registrations">Allow New Registrations</label>
+                <select id="allow_registrations" name="allow_registrations" class="form-control">
+                    <option value="true" {% if settings.allow_registrations %}selected{% endif %}>Yes</option>
+                    <option value="false" {% if not settings.allow_registrations %}selected{% endif %}>No</option>
+                </select>
+                <small class="form-text text-muted">When disabled, new users cannot register for accounts.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="default_subscription">Default Subscription Tier</label>
+                <select id="default_subscription" name="default_subscription" class="form-control">
+                    <option value="free" {% if settings.default_subscription == 'free' %}selected{% endif %}>Free</option>
+                    <option value="premium" {% if settings.default_subscription == 'premium' %}selected{% endif %}>Premium</option>
+                </select>
+                <small class="form-text text-muted">The subscription tier assigned to new users upon registration.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="app_version">App Version</label>
+                <input type="text" id="app_version" name="app_version" class="form-control" value="{{ settings.app_version }}">
+                <small class="form-text text-muted">Current version number of the application.</small>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+            
+            <div class="form-group">
+                <p><strong>Last Updated:</strong> {{ settings.last_updated.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                {% if settings.updated_by %}
+                <p><strong>Updated By:</strong> {{ settings.updated_by }}</p>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span>Notification Settings</span>
+    </div>
+    <div>
+        <form action="#" method="POST">
+            <div class="form-group">
+                <label for="enable_email_notifications">Email Notifications</label>
+                <select id="enable_email_notifications" name="enable_email_notifications" class="form-control">
+                    <option value="true" selected>Enabled</option>
+                    <option value="false">Disabled</option>
+                </select>
+                <small class="form-text text-muted">Enable/disable email notifications to users.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="enable_push_notifications">Push Notifications</label>
+                <select id="enable_push_notifications" name="enable_push_notifications" class="form-control">
+                    <option value="true" selected>Enabled</option>
+                    <option value="false">Disabled</option>
+                </select>
+                <small class="form-text text-muted">Enable/disable push notifications to mobile devices.</small>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Save Notification Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span>System Information</span>
+    </div>
+    <div>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>MongoDB Version</th>
+                    <td>8.0.9</td>
+                </tr>
+                <tr>
+                    <th>Flask Version</th>
+                    <td>2.3.2</td>
+                </tr>
+                <tr>
+                    <th>Environment</th>
+                    <td>Development</td>
+                </tr>
+                <tr>
+                    <th>System Time</th>
+                    <td id="system-time"></td>
+                </tr>
+                <tr>
+                    <th>Database Collections</th>
+                    <td>users, nutrition_logs, body_logs, workouts, exercises, settings</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update system time
+    function updateSystemTime() {
+        const now = new Date();
+        document.getElementById('system-time').textContent = now.toLocaleString();
+    }
+    
+    updateSystemTime();
+    setInterval(updateSystemTime, 1000);
+</script>
+{% endblock %}
