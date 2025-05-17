@@ -196,11 +196,11 @@ def exercises():
                            total_exercises=total_exercises,
                            active_tab='exercises')
 
-# Add exercise
+# Add exercise - RENAMED to avoid conflict
 @admin_bp.route('/exercises/add', methods=['GET', 'POST'])
 @login_required
 @admin_required
-def add_exercise():
+def add_exercise_route():
     if request.method == 'POST':
         try:
             # Get form data
@@ -214,6 +214,7 @@ def add_exercise():
                 'difficulty': data.get('difficulty'),
                 'instruction': data.get('instruction'),
                 'video_url': data.get('video_url'),
+                'equipment': data.get('equipment', '').split(',') if data.get('equipment') else [],
                 'created_at': datetime.utcnow(),
                 'created_by': str(current_user.id)
             }
@@ -230,7 +231,7 @@ def add_exercise():
             current_app.logger.error(f"Error adding exercise: {str(e)}")
             flash('Error adding exercise', 'danger')
         
-        return redirect(url_for('admin.add_exercise'))
+        return redirect(url_for('admin.add_exercise_route'))
     
     # GET request - show form
     return render_template('admin/exercise_form.html', 
@@ -355,6 +356,7 @@ def edit_exercise(exercise_id):
                 'difficulty': data.get('difficulty'),
                 'instruction': data.get('instruction'),
                 'video_url': data.get('video_url'),
+                'equipment': data.get('equipment', '').split(',') if data.get('equipment') else [],
                 'updated_at': datetime.utcnow(),
                 'updated_by': str(current_user.id)
             }

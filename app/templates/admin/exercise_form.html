@@ -16,7 +16,7 @@
         <span>{% if exercise %}Edit Exercise: {{ exercise.name }}{% else %}Add New Exercise{% endif %}</span>
     </div>
     <div>
-        <form action="{% if exercise %}{{ url_for('admin.edit_exercise', exercise_id=exercise._id) }}{% else %}{{ url_for('admin.add_exercise') }}{% endif %}" method="POST">
+<form action="{% if exercise %}{{ url_for('admin.edit_exercise', exercise_id=exercise._id) }}{% else %}{{ url_for('admin.add_exercise_route') }}{% endif %}" method="POST">
             <div class="form-group">
                 <label for="name">Exercise Name</label>
                 <input type="text" id="name" name="name" class="form-control" value="{{ exercise.name if exercise else '' }}" required>
@@ -55,6 +55,12 @@
             <div class="form-group">
                 <label for="instruction">Instructions</label>
                 <textarea id="instruction" name="instruction" class="form-control" rows="5" required>{{ exercise.instruction if exercise else '' }}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="equipment">Equipment (comma separated)</label>
+                <input type="text" id="equipment" name="equipment" class="form-control" value="{{ exercise.equipment|join(',') if exercise and exercise.equipment else '' }}">
+                <small class="form-text text-muted">Example: barbell, dumbbell, bodyweight</small>
             </div>
             
             <div class="form-group">

@@ -1,3 +1,4 @@
+# app/__init__.py
 from flask import Flask, render_template, flash
 from flask_pymongo import PyMongo
 from flask_login import LoginManager, login_required, current_user
@@ -27,11 +28,18 @@ def create_app(config_name='default'):
     cluster = os.environ.get('MONGO_CLUSTER')
     database = app.config.get('MONGO_DATABASE', 'sweatz_dev')
     
-    app.config['MONGO_URI'] = f"mongodb+srv://{username}:{password}@{cluster}/{database}?retryWrites=true&w=majority&appName=Cluster0"
-    print(f"MongoDB URI constructed: mongodb+srv://{username}:****@{cluster}/{database}?retryWrites=true&w=majority&appName=Cluster0")
+    # Add parameters to try fixing SSL issue
+    app.config['MONGO_URI'] = f"mongodb+srv://{username}:{password}@{cluster}/{database}?retryWrites=true&w=majority&appName=Cluster0&ssl=true&tlsAllowInvalidCertificates=true"
+    print(f"MongoDB URI constructed: mongodb+srv://{username}:****@{cluster}/{database}?retryWrites=true&w=majority&appName=Cluster0&ssl=true&tlsAllowInvalidCertificates=true")
     
     # Initialize extensions with app
-    mongo.init_app(app)
+    try:
+        mongo.init_app(app)
+        print("MongoDB connection successful!")
+    except Exception as e:
+        print(f"MongoDB connection error: {e}")
+        print("App will run with limited functionality.")
+    
     login_manager.init_app(app)
     cors.init_app(app)
     
@@ -44,11 +52,16 @@ def create_app(config_name='default'):
         
         # Register blueprints
         from app.api.auth import auth_bp
-        app.register_blueprint(auth_bp, url_prefix='/api/auth')
+        app.register_blueprint(auth_bp)
         
         # Register admin blueprint
         from app.api.admin import admin_bp
         app.register_blueprint(admin_bp)
+        
+        # Register API blueprints
+        from app.api.nutrition import nutrition_bp
+        app.register_blueprint(nutrition_bp)
+        
     except ImportError as e:
         print(f"Warning: Could not import modules: {e}")
     
@@ -96,4 +109,17 @@ def create_app(config_name='default'):
         flash('An internal server error occurred', 'danger')
         return render_template('500.html'), 500
     
+
+    # In the create_app function in app/__init__.py
+    # Inside the try block where you register blueprints:
+
+    from app.api.body import body_bp
+    app.register_blueprint(body_bp)
+
+    # In the create_app function in app/__init__.py
+    # Inside the try block where you register blueprints:
+
+    from app.api.workouts import workouts_bp
+    app.register_blueprint(workouts_bp)
+        
     return app

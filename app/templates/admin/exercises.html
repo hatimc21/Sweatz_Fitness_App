@@ -6,7 +6,7 @@
 
 {% block actions %}
 <div>
-    <a href="{{ url_for('admin.add_exercise') }}" class="btn btn-primary">Add New Exercise</a>
+<a href="{{ url_for('admin.add_exercise_route') }}" class="btn btn-primary">Add New Exercise</a>
     
     <form action="{{ url_for('admin.exercises') }}" method="GET" style="display: inline-block; margin-left: 10px;">
         <select name="muscle_group" class="form-control" style="display: inline-block; width: auto;">
