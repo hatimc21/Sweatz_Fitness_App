@@ -4,57 +4,61 @@
 
 {% block page_title %}Manage Exercises{% endblock %}
 
-{% block actions %}
-<div class="d-flex gap-2">
-    <a href="{{ url_for('admin.add_exercise_route') }}" class="btn btn-primary">Add New Exercise</a>
-    
-    <form action="{{ url_for('admin.exercises') }}" method="GET" class="d-flex gap-2">
-        <div class="input-group">
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Manage Exercises</h2>
+    <a href="{{ url_for('admin.add_exercise_route') }}" class="btn btn-success">Add New Exercise</a>
+</div>
+
+<!-- Search and Filter -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form action="{{ url_for('admin.exercises') }}" method="GET" class="d-flex">
             <input type="text" name="search" class="form-control" placeholder="Search exercises..." value="{{ request.args.get('search', '') }}">
-            <button type="submit" class="btn btn-outline-primary">Search</button>
-        </div>
-        
-        <select name="muscle_group" class="form-select" style="width: auto;">
+            <button type="submit" class="btn btn-primary ms-2">Search</button>
+        </form>
+    </div>
+    <div class="col-md-6 d-flex justify-content-end">
+        <select name="muscle_group" id="muscleGroupFilter" class="form-select me-2" style="width: auto;">
             <option value="">All Muscle Groups</option>
             {% for group in muscle_groups %}
             <option value="{{ group }}" {% if request.args.get('muscle_group') == group %}selected{% endif %}>{{ group }}</option>
             {% endfor %}
         </select>
         
-        <select name="difficulty" class="form-select" style="width: auto;">
+        <select name="difficulty" id="difficultyFilter" class="form-select me-2" style="width: auto;">
             <option value="">All Difficulties</option>
             <option value="beginner" {% if request.args.get('difficulty') == 'beginner' %}selected{% endif %}>Beginner</option>
             <option value="intermediate" {% if request.args.get('difficulty') == 'intermediate' %}selected{% endif %}>Intermediate</option>
             <option value="advanced" {% if request.args.get('difficulty') == 'advanced' %}selected{% endif %}>Advanced</option>
         </select>
         
-        <select name="equipment" class="form-select" style="width: auto;">
+        <select name="equipment" id="equipmentFilter" class="form-select me-2" style="width: auto;">
             <option value="">All Equipment</option>
             {% for equip in equipment_list %}
             <option value="{{ equip }}" {% if request.args.get('equipment') == equip %}selected{% endif %}>{{ equip|title }}</option>
             {% endfor %}
         </select>
         
-        <button type="submit" class="btn btn-primary">Filter</button>
-        <a href="{{ url_for('admin.exercises') }}" class="btn btn-outline-secondary">Reset</a>
-    </form>
+        <button id="filterBtn" class="btn btn-success me-2">Filter</button>
+        <a href="{{ url_for('admin.exercises') }}" class="btn btn-secondary">Reset</a>
+    </div>
 </div>
-{% endblock %}
 
-{% block content %}
+<!-- Exercise List -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>Exercises ({{ total_exercises }})</span>
         <div>
-            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" disabled>Delete Selected</button>
-            <a href="{{ url_for('admin.export_exercises') }}" class="btn btn-secondary btn-sm">Export CSV</a>
+            <button id="deleteSelectedBtn" class="btn btn-danger me-2" disabled>Delete Selected</button>
+            <a href="{{ url_for('admin.export_exercises') }}" class="btn btn-primary">Export CSV</a>
         </div>
     </div>
     <div class="table-responsive">
         <table class="table table-hover">
             <thead>
                 <tr>
-                    <th>
+                    <th width="40px">
                         <input type="checkbox" id="selectAllExercises" class="form-check-input">
                     </th>
                     <th>Name</th>
@@ -71,14 +75,12 @@
                         <input type="checkbox" class="exercise-select form-check-input" value="{{ exercise._id }}">
                     </td>
                     <td>{{ exercise.name }}</td>
-                    <td>
-                        <span class="badge bg-secondary">{{ exercise.muscle_group }}</span>
-                    </td>
+                    <td>{{ exercise.muscle_group }}</td>
                     <td>
                         {% if exercise.difficulty == 'beginner' %}
                         <span class="badge bg-success">Beginner</span>
                         {% elif exercise.difficulty == 'intermediate' %}
-                        <span class="badge bg-warning">Intermediate</span>
+                        <span class="badge bg-warning text-dark">Intermediate</span>
                         {% elif exercise.difficulty == 'advanced' %}
                         <span class="badge bg-danger">Advanced</span>
                         {% else %}
@@ -87,21 +89,19 @@
                     </td>
                     <td>
                         {% for item in exercise.equipment %}
-                        <span class="badge bg-info me-1">{{ item }}</span>
+                        <span class="badge bg-info text-dark me-1">{{ item }}</span>
                         {% endfor %}
                     </td>
                     <td>
-                        <div class="btn-group btn-group-sm">
-                            <a href="{{ url_for('admin.edit_exercise', exercise_id=exercise._id) }}" class="btn btn-primary" title="Edit Exercise">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <button type="button" class="btn btn-info view-exercise-btn" data-exercise-id="{{ exercise._id }}" title="View Details">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button type="button" class="btn btn-danger delete-exercise-btn" data-exercise-id="{{ exercise._id }}" title="Delete Exercise">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
+                        <a href="{{ url_for('admin.edit_exercise', exercise_id=exercise._id) }}" class="btn btn-sm btn-success me-1">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-primary me-1 view-exercise-btn" data-exercise-id="{{ exercise._id }}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger delete-exercise-btn" data-exercise-id="{{ exercise._id }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -120,172 +120,180 @@
             </tbody>
         </table>
     </div>
+</div>
+
+<!-- Exercise Details Section (Right Panel) -->
+<div id="exerciseDetailsPanel" class="exercise-details-panel">
+    <h5 class="mb-3">Exercise Details</h5>
+    <div id="exerciseDetailsLoading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading...</p>
+    </div>
     
-    {% if total_pages > 1 %}
-    <div class="card-footer">
-        <nav aria-label="Exercise pagination">
-            <ul class="pagination justify-content-center mb-0">
-                <li class="page-item {% if page == 1 %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('admin.exercises', page=page-1, muscle_group=request.args.get('muscle_group'), difficulty=request.args.get('difficulty'), equipment=request.args.get('equipment'), search=request.args.get('search')) }}" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                    </a>
-                </li>
-                
-                {% for i in range(1, total_pages + 1) %}
-                {% if i == page %}
-                <li class="page-item active" aria-current="page">
-                    <span class="page-link">{{ i }}</span>
-                </li>
-                {% elif i >= page - 2 and i <= page + 2 or i == 1 or i == total_pages %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('admin.exercises', page=i, muscle_group=request.args.get('muscle_group'), difficulty=request.args.get('difficulty'), equipment=request.args.get('equipment'), search=request.args.get('search')) }}">{{ i }}</a>
-                </li>
-                {% elif i == page - 3 or i == page + 3 %}
-                <li class="page-item disabled">
-                    <span class="page-link">...</span>
-                </li>
-                {% endif %}
-                {% endfor %}
-                
-                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('admin.exercises', page=page+1, muscle_group=request.args.get('muscle_group'), difficulty=request.args.get('difficulty'), equipment=request.args.get('equipment'), search=request.args.get('search')) }}" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
+    <div id="exerciseDetailsContent" class="d-none">
+        <p>Loading...</p>
+        <div class="mb-3">
+            <p><strong>Muscle Group:</strong> <span id="detailMuscleGroup"></span></p>
+            <p><strong>Difficulty:</strong> <span id="detailDifficulty"></span></p>
+            <p><strong>Equipment:</strong> <span id="detailEquipment"></span></p>
+            <p><strong>Created:</strong> <span id="detailCreated"></span></p>
+            <p><strong>Created By:</strong> <span id="detailCreatedBy"></span></p>
+            <p><strong>Last Updated:</strong> <span id="detailLastUpdated"></span></p>
+        </div>
+        
+        <div class="mb-3">
+            <h6>Description</h6>
+            <p id="detailDescription"></p>
+        </div>
+        
+        <div class="mb-3">
+            <h6>Instructions</h6>
+            <div id="detailInstructions"></div>
+        </div>
+        
+        <div class="mb-3">
+            <h6>Video Demonstration</h6>
+            <div id="detailVideoDemo"></div>
+        </div>
+        
+        <div class="mt-4">
+            <button class="btn btn-primary me-2" id="editExerciseBtn">Edit Exercise</button>
+            <button class="btn btn-secondary" id="closeDetailsBtn">Close</button>
+        </div>
     </div>
-    {% endif %}
-</div>
-
-<!-- Exercise Detail Modal -->
-<div class="modal fade" id="exerciseDetailModal" tabindex="-1" aria-labelledby="exerciseDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="exerciseDetailModalLabel">Exercise Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="text-center py-4" id="exerciseDetailLoading">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-                <div id="exerciseDetailContent" class="d-none">
-                    <h3 id="detailExerciseName"></h3>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <p><strong>Muscle Group:</strong> <span id="detailMuscleGroup"></span></p>
-                            <p><strong>Difficulty:</strong> <span id="detailDifficulty"></span></p>
-                            <p><strong>Equipment:</strong> <span id="detailEquipment"></span></p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Created:</strong> <span id="detailCreatedAt"></span></p>
-                            <p><strong>Created By:</strong> <span id="detailCreatedBy"></span></p>
-                            <p><strong>Last Updated:</strong> <span id="detailUpdatedAt"></span></p>
-                        </div>
-                    </div>
-                    
-                    <h5>Description</h5>
-                    <p id="detailDescription" class="mb-4"></p>
-                    
-                    <h5>Instructions</h5>
-                    <div id="detailInstructions" class="mb-4"></div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h5>Video Demonstration</h5>
-                            <div id="detailVideoContainer" class="ratio ratio-16x9">
-                                <!-- Video will be loaded here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <a href="#" id="editExerciseBtn" class="btn btn-primary">Edit Exercise</a>
-            </div>
+    
+    <!-- Confirm Deletion Section -->
+    <div id="confirmDeletionSection" class="d-none">
+        <h5 class="mb-3">Confirm Deletion</h5>
+        <p>Are you sure you want to delete this exercise? This action cannot be undone.</p>
+        <p><strong>Exercise:</strong> <span id="deleteExerciseName"></span></p>
+        
+        <div class="mt-4">
+            <button class="btn btn-danger me-2" id="confirmDeleteBtn">Delete Exercise</button>
+            <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
+        </div>
+    </div>
+    
+    <!-- Confirm Bulk Deletion Section -->
+    <div id="confirmBulkDeletionSection" class="d-none">
+        <h5 class="mb-3">Confirm Bulk Deletion</h5>
+        <p>Are you sure you want to delete the selected exercises? This action cannot be undone.</p>
+        <p><strong>Selected exercises:</strong> <span id="selectedExercisesCount">0</span></p>
+        
+        <div class="mt-4">
+            <button class="btn btn-danger me-2" id="confirmBulkDeleteBtn">Delete Exercises</button>
+            <button class="btn btn-secondary" id="cancelBulkDeleteBtn">Cancel</button>
         </div>
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteExerciseModal" tabindex="-1" aria-labelledby="deleteExerciseModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteExerciseModalLabel">Confirm Deletion</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to delete this exercise? This action cannot be undone.</p>
-                <p><strong>Exercise:</strong> <span id="deleteExerciseName"></span></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Exercise</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% endblock %}
 
-<!-- Bulk Delete Modal -->
-<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="bulkDeleteModalLabel">Confirm Bulk Deletion</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to delete the selected exercises? This action cannot be undone.</p>
-                <p><strong>Selected exercises:</strong> <span id="bulkDeleteCount">0</span></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmBulkDeleteBtn">Delete Exercises</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% block styles %}
+<style>
+.exercise-details-panel {
+    position: fixed;
+    right: -400px;
+    top: 0;
+    width: 400px;
+    height: 100vh;
+    background-color: white;
+    border-left: 1px solid #ddd;
+    padding: 20px;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    transition: right 0.3s ease;
+    z-index: 1000;
+}
+
+.exercise-details-panel.active {
+    right: 0;
+}
+
+.panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    display: none;
+}
+
+.panel-overlay.active {
+    display: block;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Exercise detail view
-    const viewExerciseBtns = document.querySelectorAll('.view-exercise-btn');
-    viewExerciseBtns.forEach(btn => {
+    // Panel functionality
+    const detailsPanel = document.getElementById('exerciseDetailsPanel');
+    const overlay = document.createElement('div');
+    overlay.className = 'panel-overlay';
+    document.body.appendChild(overlay);
+    
+    function openPanel() {
+        detailsPanel.classList.add('active');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closePanel() {
+        detailsPanel.classList.remove('active');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    
+    // Close panel when clicking on overlay
+    overlay.addEventListener('click', closePanel);
+    
+    // Close panel button
+    document.getElementById('closeDetailsBtn').addEventListener('click', closePanel);
+    
+    // Exercise details view
+    const viewBtns = document.querySelectorAll('.view-exercise-btn');
+    viewBtns.forEach(btn => {
         btn.addEventListener('click', function() {
             const exerciseId = this.getAttribute('data-exercise-id');
-            openExerciseDetailModal(exerciseId);
+            showExerciseDetails(exerciseId);
         });
     });
     
-    // Delete exercise
-    const deleteExerciseBtns = document.querySelectorAll('.delete-exercise-btn');
-    let exerciseToDelete = null;
+    // Delete exercise buttons
+    const deleteBtns = document.querySelectorAll('.delete-exercise-btn');
+    let currentExerciseId = null;
     
-    deleteExerciseBtns.forEach(btn => {
+    deleteBtns.forEach(btn => {
         btn.addEventListener('click', function() {
-            exerciseToDelete = this.getAttribute('data-exercise-id');
+            currentExerciseId = this.getAttribute('data-exercise-id');
             const exerciseName = this.closest('tr').querySelector('td:nth-child(2)').textContent;
-            document.getElementById('deleteExerciseName').textContent = exerciseName;
             
-            const deleteModal = new bootstrap.Modal(document.getElementById('deleteExerciseModal'));
-            deleteModal.show();
+            // Hide exercise details and show deletion confirmation
+            document.getElementById('exerciseDetailsContent').classList.add('d-none');
+            document.getElementById('exerciseDetailsLoading').classList.add('d-none');
+            document.getElementById('confirmDeletionSection').classList.remove('d-none');
+            document.getElementById('confirmBulkDeletionSection').classList.add('d-none');
+            
+            document.getElementById('deleteExerciseName').textContent = exerciseName;
+            openPanel();
         });
     });
     
-    // Confirm delete
+    // Confirm delete button
     document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-        if (exerciseToDelete) {
-            deleteExercise(exerciseToDelete);
+        if (currentExerciseId) {
+            deleteExercise(currentExerciseId);
         }
     });
+    
+    // Cancel delete button
+    document.getElementById('cancelDeleteBtn').addEventListener('click', closePanel);
     
     // Select all exercises checkbox
     const selectAllCheckbox = document.getElementById('selectAllExercises');
@@ -296,25 +304,30 @@ document.addEventListener('DOMContentLoaded', function() {
         exerciseCheckboxes.forEach(checkbox => {
             checkbox.checked = isChecked;
         });
-        updateBulkDeleteButton();
+        updateDeleteSelectedButton();
     });
     
     // Individual checkboxes
     exerciseCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateBulkDeleteButton);
+        checkbox.addEventListener('change', updateDeleteSelectedButton);
     });
     
-    // Bulk delete button
-    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-    bulkDeleteBtn.addEventListener('click', function() {
+    // Delete selected button
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    deleteSelectedBtn.addEventListener('click', function() {
         const selectedExercises = getSelectedExercises();
-        document.getElementById('bulkDeleteCount').textContent = selectedExercises.length;
         
-        const bulkDeleteModal = new bootstrap.Modal(document.getElementById('bulkDeleteModal'));
-        bulkDeleteModal.show();
+        // Show bulk deletion confirmation
+        document.getElementById('exerciseDetailsContent').classList.add('d-none');
+        document.getElementById('exerciseDetailsLoading').classList.add('d-none');
+        document.getElementById('confirmDeletionSection').classList.add('d-none');
+        document.getElementById('confirmBulkDeletionSection').classList.remove('d-none');
+        
+        document.getElementById('selectedExercisesCount').textContent = selectedExercises.length;
+        openPanel();
     });
     
-    // Confirm bulk delete
+    // Confirm bulk delete button
     document.getElementById('confirmBulkDeleteBtn').addEventListener('click', function() {
         const selectedExercises = getSelectedExercises();
         if (selectedExercises.length > 0) {
@@ -322,15 +335,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Functions
-    function openExerciseDetailModal(exerciseId) {
-        // Show loading state
-        document.getElementById('exerciseDetailLoading').classList.remove('d-none');
-        document.getElementById('exerciseDetailContent').classList.add('d-none');
+    // Cancel bulk delete button
+    document.getElementById('cancelBulkDeleteBtn').addEventListener('click', closePanel);
+    
+    // Filter form submission
+    document.getElementById('filterBtn').addEventListener('click', function() {
+        const muscleGroup = document.getElementById('muscleGroupFilter').value;
+        const difficulty = document.getElementById('difficultyFilter').value;
+        const equipment = document.getElementById('equipmentFilter').value;
         
-        // Open modal
-        const modal = new bootstrap.Modal(document.getElementById('exerciseDetailModal'));
-        modal.show();
+        let url = '{{ url_for('admin.exercises') }}?';
+        if (muscleGroup) url += `muscle_group=${encodeURIComponent(muscleGroup)}&`;
+        if (difficulty) url += `difficulty=${encodeURIComponent(difficulty)}&`;
+        if (equipment) url += `equipment=${encodeURIComponent(equipment)}&`;
+        
+        window.location.href = url;
+    });
+    
+    // Functions
+    function showExerciseDetails(exerciseId) {
+        // Reset panel content
+        document.getElementById('exerciseDetailsContent').classList.add('d-none');
+        document.getElementById('exerciseDetailsLoading').classList.remove('d-none');
+        document.getElementById('confirmDeletionSection').classList.add('d-none');
+        document.getElementById('confirmBulkDeletionSection').classList.add('d-none');
+        
+        openPanel();
         
         // Fetch exercise details
         fetch(`/admin/api/exercises/${exerciseId}`)
@@ -347,52 +377,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Error loading exercise details. Please try again.');
             })
             .finally(() => {
-                document.getElementById('exerciseDetailLoading').classList.add('d-none');
-                document.getElementById('exerciseDetailContent').classList.remove('d-none');
+                document.getElementById('exerciseDetailsLoading').classList.add('d-none');
+                document.getElementById('exerciseDetailsContent').classList.remove('d-none');
             });
             
-        // Update edit button href
-        document.getElementById('editExerciseBtn').href = `/admin/exercises/edit/${exerciseId}`;
+        // Update edit button
+        document.getElementById('editExerciseBtn').onclick = function() {
+            window.location.href = `/admin/exercises/edit/${exerciseId}`;
+        };
     }
     
     function populateExerciseDetails(exercise) {
-        document.getElementById('detailExerciseName').textContent = exercise.name;
-        document.getElementById('detailMuscleGroup').textContent = exercise.muscle_group;
+        // Set title (hidden in the design, but keep it for potential future use)
+        const title = document.querySelector('#exerciseDetailsContent h5');
+        if (title) title.textContent = exercise.name;
         
-        // Set difficulty with badge
-        const difficultySpan = document.getElementById('detailDifficulty');
-        difficultySpan.textContent = exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1);
-        difficultySpan.className = '';
-        if (exercise.difficulty === 'beginner') {
-            difficultySpan.className = 'badge bg-success';
-        } else if (exercise.difficulty === 'intermediate') {
-            difficultySpan.className = 'badge bg-warning';
-        } else if (exercise.difficulty === 'advanced') {
-            difficultySpan.className = 'badge bg-danger';
-        }
+        // Set basic info
+        document.getElementById('detailMuscleGroup').textContent = exercise.muscle_group || 'Not specified';
+        document.getElementById('detailDifficulty').textContent = exercise.difficulty ? exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1) : 'Not specified';
         
-        // Equipment list
-        const equipmentSpan = document.getElementById('detailEquipment');
-        equipmentSpan.innerHTML = '';
+        // Set equipment
+        const equipmentEl = document.getElementById('detailEquipment');
+        equipmentEl.innerHTML = '';
         if (exercise.equipment && exercise.equipment.length > 0) {
             exercise.equipment.forEach(item => {
                 const badge = document.createElement('span');
-                badge.className = 'badge bg-info me-1';
+                badge.className = 'badge bg-info text-dark me-1';
                 badge.textContent = item;
-                equipmentSpan.appendChild(badge);
+                equipmentEl.appendChild(badge);
             });
         } else {
-            equipmentSpan.textContent = 'None specified';
+            equipmentEl.textContent = 'None specified';
         }
         
-        // Creation info
-        document.getElementById('detailCreatedAt').textContent = new Date(exercise.created_at).toLocaleString();
+        // Set creation info
+        document.getElementById('detailCreated').textContent = exercise.created_at ? new Date(exercise.created_at).toLocaleString() : 'Unknown';
         document.getElementById('detailCreatedBy').textContent = exercise.created_by_username || 'System';
-        document.getElementById('detailUpdatedAt').textContent = exercise.updated_at ? new Date(exercise.updated_at).toLocaleString() : 'Never';
+        document.getElementById('detailLastUpdated').textContent = exercise.updated_at ? new Date(exercise.updated_at).toLocaleString() : 'Never';
         
-        // Description and instructions
+        // Set description
         document.getElementById('detailDescription').textContent = exercise.description || 'No description provided.';
         
+        // Set instructions
         const instructionsDiv = document.getElementById('detailInstructions');
         instructionsDiv.innerHTML = '';
         if (exercise.instruction) {
@@ -410,9 +436,9 @@ document.addEventListener('DOMContentLoaded', function() {
             instructionsDiv.textContent = 'No instructions provided.';
         }
         
-        // Video embed if available
-        const videoContainer = document.getElementById('detailVideoContainer');
-        videoContainer.innerHTML = '';
+        // Set video
+        const videoDemo = document.getElementById('detailVideoDemo');
+        videoDemo.innerHTML = '';
         if (exercise.video_url) {
             // Check if it's a YouTube URL
             if (exercise.video_url.includes('youtube.com') || exercise.video_url.includes('youtu.be')) {
@@ -427,19 +453,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (videoId) {
                     const iframe = document.createElement('iframe');
                     iframe.src = `https://www.youtube.com/embed/${videoId}`;
+                    iframe.width = '100%';
+                    iframe.height = '200';
                     iframe.title = "YouTube video player";
                     iframe.frameBorder = "0";
                     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
                     iframe.allowFullscreen = true;
-                    videoContainer.appendChild(iframe);
+                    videoDemo.appendChild(iframe);
                 } else {
-                    videoContainer.innerHTML = `<div class="alert alert-info">Video available at: <a href="${exercise.video_url}" target="_blank">${exercise.video_url}</a></div>`;
+                    videoDemo.innerHTML = `<div class="alert alert-info">Video available at: <a href="${exercise.video_url}" target="_blank">${exercise.video_url}</a></div>`;
                 }
             } else {
-                videoContainer.innerHTML = `<div class="alert alert-info">Video available at: <a href="${exercise.video_url}" target="_blank">${exercise.video_url}</a></div>`;
+                videoDemo.innerHTML = `<div class="alert alert-info">Video available at: <a href="${exercise.video_url}" target="_blank">${exercise.video_url}</a></div>`;
             }
         } else {
-            videoContainer.innerHTML = '<div class="alert alert-secondary">No video demonstration available.</div>';
+            videoDemo.innerHTML = '<div class="alert alert-secondary">No video demonstration available.</div>';
         }
     }
     
@@ -450,10 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Close modal
-                bootstrap.Modal.getInstance(document.getElementById('deleteExerciseModal')).hide();
-                
-                // Reload page to show updated list
+                closePanel();
                 window.location.reload();
             } else {
                 alert('Error deleting exercise: ' + (data.error || 'Unknown error'));
@@ -465,16 +490,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function updateBulkDeleteButton() {
+    function updateDeleteSelectedButton() {
         const selectedExercises = getSelectedExercises();
-        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         
         if (selectedExercises.length > 0) {
-            bulkDeleteBtn.removeAttribute('disabled');
-            bulkDeleteBtn.textContent = `Delete Selected (${selectedExercises.length})`;
+            deleteSelectedBtn.disabled = false;
+            deleteSelectedBtn.textContent = `Delete Selected (${selectedExercises.length})`;
         } else {
-            bulkDeleteBtn.setAttribute('disabled', 'disabled');
-            bulkDeleteBtn.textContent = 'Delete Selected';
+            deleteSelectedBtn.disabled = true;
+            deleteSelectedBtn.textContent = 'Delete Selected';
         }
     }
     
@@ -499,10 +524,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Close modal
-                bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
-                
-                // Reload page to show updated list
+                closePanel();
                 window.location.reload();
             } else {
                 alert('Error deleting exercises: ' + (data.error || 'Unknown error'));
