@@ -242,3 +242,75 @@ class Workout:
         ).sort("date", -1).limit(limit)
         
         return list(workouts)
+
+# Add or enhance these methods in app/models/workouts.py
+
+@staticmethod
+def create_workout_template(user_id, template_data):
+    """Create a workout template"""
+    template = {
+        "created_by": ObjectId(user_id),
+        "name": template_data.get("name"),
+        "description": template_data.get("description", ""),
+        "type": template_data.get("type", "custom"),  # custom, split, full-body, etc.
+        "is_public": template_data.get("is_public", False),
+        "tags": template_data.get("tags", []),
+        "days": template_data.get("days", []),  # Array of day objects with exercises
+        "created_at": datetime.now()
+    }
+    
+    result = mongo.db.workout_routines.insert_one(template)
+    return str(result.inserted_id)
+
+@staticmethod
+def get_workout_templates(include_public=True, limit=20, skip=0):
+    """Get workout templates"""
+    query = {}
+    
+    if not include_public:
+        query["is_public"] = True
+    
+    templates = mongo.db.workout_routines.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    return list(templates)
+
+@staticmethod
+def get_workout_template(template_id):
+    """Get a specific workout template"""
+    return mongo.db.workout_routines.find_one({"_id": ObjectId(template_id)})
+
+@staticmethod
+def update_workout_template(template_id, user_id, template_data):
+    """Update a workout template"""
+    update_data = {
+        "name": template_data.get("name"),
+        "description": template_data.get("description"),
+        "type": template_data.get("type"),
+        "is_public": template_data.get("is_public", False),
+        "tags": template_data.get("tags", []),
+        "days": template_data.get("days", []),
+        "updated_at": datetime.now(),
+        "updated_by": ObjectId(user_id)
+    }
+    
+    result = mongo.db.workout_routines.update_one(
+        {"_id": ObjectId(template_id)},
+        {"$set": update_data}
+    )
+    
+    return result.modified_count > 0
+
+@staticmethod
+def delete_workout_template(template_id):
+    """Delete a workout template"""
+    result = mongo.db.workout_routines.delete_one({"_id": ObjectId(template_id)})
+    return result.deleted_count > 0
+
+@staticmethod
+def parse_template_form_data(form_data):
+    """Parse complex nested form data for workout templates"""
+    days = []
+    
+    # Logic to extract days and exercises from form data
+    # This is where you'd handle complex form data processing
+    
+    return days

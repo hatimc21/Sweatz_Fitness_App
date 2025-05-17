@@ -1,0 +1,531 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{% if template %}Edit Workout Template{% else %}Add Workout Template{% endif %} - Sweatz Admin{% endblock %}
+
+{% block page_title %}{% if template %}Edit Workout Template{% else %}Add Workout Template{% endif %}{% endblock %}
+
+{% block actions %}
+<div>
+    <a href="{{ url_for('admin.workout_templates') }}" class="btn btn-secondary">Back to Templates</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span>{% if template %}Edit Template: {{ template.name }}{% else %}Add New Workout Template{% endif %}</span>
+    </div>
+    <div class="card-body">
+        <form id="templateForm" action="{% if template %}{{ url_for('admin.edit_workout_template', template_id=template._id) }}{% else %}{{ url_for('admin.add_workout_template') }}{% endif %}" method="POST">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="name" class="form-label">Template Name</label>
+                        <input type="text" id="name" name="name" class="form-control" value="{{ template.name if template else '' }}" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="type" class="form-label">Workout Type</label>
+                        <select id="type" name="type" class="form-control" required>
+                            <option value="">Select Type</option>
+                            <option value="custom" {% if template and template.type == 'custom' %}selected{% endif %}>Custom</option>
+                            <option value="split" {% if template and template.type == 'split' %}selected{% endif %}>Split</option>
+                            <option value="full-body" {% if template and template.type == 'full-body' %}selected{% endif %}>Full Body</option>
+                            <option value="push-pull" {% if template and template.type == 'push-pull' %}selected{% endif %}>Push/Pull</option>
+                            <option value="upper-lower" {% if template and template.type == 'upper-lower' %}selected{% endif %}>Upper/Lower</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label for="description" class="form-label">Description</label>
+                <textarea id="description" name="description" class="form-control" rows="3">{{ template.description if template else '' }}</textarea>
+            </div>
+            
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="is_public" name="is_public" value="true" {% if template and template.is_public %}checked{% endif %}>
+                <label class="form-check-label" for="is_public">Make this template public (available to all users)</label>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label for="tags" class="form-label">Tags (comma separated)</label>
+                <input type="text" id="tags" name="tags" class="form-control" value="{{ template.tags|join(',') if template and template.tags else '' }}">
+                <div class="form-text text-muted">Example: beginner, strength, home</div>
+            </div>
+            
+            <div class="mb-4">
+                <h5 class="border-bottom pb-2">Workout Days</h5>
+                <div id="days-container">
+                    {% if template and template.days %}
+                        {% for day in template.days %}
+                            <div class="card mb-3 day-card">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <input type="text" class="form-control form-control-sm day-name" 
+                                           name="days[{{ loop.index0 }}][name]" 
+                                           placeholder="Day Name" 
+                                           value="{{ day.name }}" 
+                                           style="width: auto;">
+                                    <button type="button" class="btn btn-sm btn-danger remove-day">Remove</button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="exercises-container" data-day-index="{{ loop.index0 }}">
+                                        {% for exercise in day.exercises %}
+                                            <div class="exercise-item mb-2 border-bottom pb-2">
+                                                <div class="d-flex justify-content-between">
+                                                    <input type="hidden" name="days[{{ loop.index0 }}][exercises][{{ loop.index0 }}][exercise_id]" value="{{ exercise.exercise_id }}">
+                                                    <div class="exercise-info">
+                                                        <strong>{{ exercise.name }}</strong>
+                                                        <div>
+                                                            <small class="text-muted">
+                                                                {% if exercise.sets %}{{ exercise.sets }} sets{% endif %}
+                                                                {% if exercise.reps %}× {{ exercise.reps }} reps{% endif %}
+                                                                {% if exercise.weight %}@ {{ exercise.weight }}kg{% endif %}
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <button type="button" class="btn btn-sm btn-secondary edit-exercise">Edit</button>
+                                                        <button type="button" class="btn btn-sm btn-danger remove-exercise">Remove</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-primary add-exercise" data-day-index="{{ loop.index0 }}">Add Exercise</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <button type="button" id="add-day" class="btn btn-secondary">Add Workout Day</button>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">{% if template %}Update Template{% else %}Save Template{% endif %}</button>
+                
+                {% if template %}
+                <button type="button" class="btn btn-danger" onclick="confirmDelete('{{ template._id }}')">
+                    <i class="fas fa-trash-alt"></i> Delete Template
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Exercise Search Modal -->
+<div class="modal fade" id="exerciseModal" tabindex="-1" aria-labelledby="exerciseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exerciseModalLabel">Add Exercise</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <input type="text" id="exercise-search" class="form-control" placeholder="Search exercises...">
+                        <button class="btn btn-outline-secondary" type="button" id="search-btn">Search</button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <select id="filter-muscle" class="form-select" style="width: auto;">
+                            <option value="">All Muscle Groups</option>
+                            {% for group in muscle_groups %}
+                            <option value="{{ group }}">{{ group }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <select id="filter-difficulty" class="form-select" style="width: auto;">
+                            <option value="">Any Difficulty</option>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="exercise-results" class="list-group">
+                    <!-- Exercise results will be loaded here -->
+                    <div class="text-center py-3">
+                        <p class="text-muted">Search for exercises to add to your workout</p>
+                    </div>
+                </div>
+                
+                <!-- Exercise Details Form -->
+                <div id="exercise-details" class="mt-3 border-top pt-3" style="display: none;">
+                    <h5>Exercise Details</h5>
+                    <div class="selected-exercise mb-3">
+                        <strong id="selected-exercise-name"></strong>
+                        <input type="hidden" id="selected-exercise-id">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="exercise-sets" class="form-label">Sets</label>
+                                <input type="number" id="exercise-sets" class="form-control" min="1" max="10" value="3">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="exercise-reps" class="form-label">Reps</label>
+                                <input type="text" id="exercise-reps" class="form-control" placeholder="e.g. 10 or 8-12">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="exercise-weight" class="form-label">Weight (optional)</label>
+                                <input type="text" id="exercise-weight" class="form-control" placeholder="e.g. 60 or BW">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group mt-3">
+                        <label for="exercise-notes" class="form-label">Notes (optional)</label>
+                        <textarea id="exercise-notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="add-exercise-btn" disabled>Add to Workout</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Current day index counter
+    let dayCounter = {% if template and template.days %}{{ template.days|length }}{% else %}0{% endif %};
+    let currentDayIndex = 0;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const daysContainer = document.getElementById('days-container');
+        const addDayBtn = document.getElementById('add-day');
+        
+        // Add day button click handler
+        addDayBtn.addEventListener('click', function() {
+            addDay();
+        });
+        
+        // If no days exist, add one by default
+        if (daysContainer.children.length === 0) {
+            addDay();
+        }
+        
+        // Event delegation for dynamic elements
+        daysContainer.addEventListener('click', function(e) {
+            // Remove day button
+            if (e.target.classList.contains('remove-day')) {
+                e.target.closest('.day-card').remove();
+                reindexDays();
+            }
+            
+            // Add exercise button
+            if (e.target.classList.contains('add-exercise')) {
+                currentDayIndex = e.target.dataset.dayIndex;
+                showExerciseModal();
+            }
+            
+            // Remove exercise button
+            if (e.target.classList.contains('remove-exercise')) {
+                e.target.closest('.exercise-item').remove();
+            }
+            
+            // Edit exercise button
+            if (e.target.classList.contains('edit-exercise')) {
+                // TODO: Implement edit exercise functionality
+                alert('Edit exercise functionality to be implemented');
+            }
+        });
+        
+        // Exercise modal functionality
+        const exerciseSearchInput = document.getElementById('exercise-search');
+        const searchBtn = document.getElementById('search-btn');
+        const exerciseResults = document.getElementById('exercise-results');
+        const filterMuscle = document.getElementById('filter-muscle');
+        const filterDifficulty = document.getElementById('filter-difficulty');
+        const exerciseDetails = document.getElementById('exercise-details');
+        const selectedExerciseName = document.getElementById('selected-exercise-name');
+        const selectedExerciseId = document.getElementById('selected-exercise-id');
+        const addExerciseBtn = document.getElementById('add-exercise-btn');
+        
+        // Search exercises
+        searchBtn.addEventListener('click', function() {
+            searchExercises();
+        });
+        
+        exerciseSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchExercises();
+                e.preventDefault();
+            }
+        });
+        
+        // Filter change
+        filterMuscle.addEventListener('change', searchExercises);
+        filterDifficulty.addEventListener('change', searchExercises);
+        
+        // Add exercise to workout
+        addExerciseBtn.addEventListener('click', function() {
+            addExerciseToWorkout();
+        });
+        
+        // Functions
+        function addDay() {
+            const dayIndex = dayCounter++;
+            const dayHtml = `
+                <div class="card mb-3 day-card">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <input type="text" class="form-control form-control-sm day-name" 
+                               name="days[${dayIndex}][name]" 
+                               placeholder="Day Name" 
+                               value="Day ${dayIndex + 1}" 
+                               style="width: auto;">
+                        <button type="button" class="btn btn-sm btn-danger remove-day">Remove</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="exercises-container" data-day-index="${dayIndex}">
+                            <!-- Exercises will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary add-exercise" data-day-index="${dayIndex}">Add Exercise</button>
+                    </div>
+                </div>
+            `;
+            
+            daysContainer.insertAdjacentHTML('beforeend', dayHtml);
+        }
+        
+        function reindexDays() {
+            const dayCards = daysContainer.querySelectorAll('.day-card');
+            dayCards.forEach((card, index) => {
+                const dayName = card.querySelector('.day-name');
+                const exercisesContainer = card.querySelector('.exercises-container');
+                const addExerciseBtn = card.querySelector('.add-exercise');
+                
+                // Update name attribute
+                dayName.name = `days[${index}][name]`;
+                
+                // Update day index for exercises container
+                exercisesContainer.dataset.dayIndex = index;
+                
+                // Update day index for add exercise button
+                addExerciseBtn.dataset.dayIndex = index;
+                
+                // Update exercise indices
+                const exercises = exercisesContainer.querySelectorAll('.exercise-item');
+                exercises.forEach((exercise, exIndex) => {
+                    const exerciseIdInput = exercise.querySelector('input[name^="days"]');
+                    if (exerciseIdInput) {
+                        exerciseIdInput.name = `days[${index}][exercises][${exIndex}][exercise_id]`;
+                    }
+                });
+            });
+            
+            // Update counter to match the number of days
+            dayCounter = dayCards.length;
+        }
+        
+        function showExerciseModal() {
+            // Reset exercise details
+            exerciseDetails.style.display = 'none';
+            selectedExerciseName.textContent = '';
+            selectedExerciseId.value = '';
+            addExerciseBtn.disabled = true;
+            
+            // Clear previous search results
+            exerciseResults.innerHTML = '<div class="text-center py-3"><p class="text-muted">Search for exercises to add to your workout</p></div>';
+            
+            // Clear search input
+            exerciseSearchInput.value = '';
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
+            modal.show();
+        }
+        
+        function searchExercises() {
+            const search = exerciseSearchInput.value.trim();
+            const muscle = filterMuscle.value;
+            const difficulty = filterDifficulty.value;
+            
+            // Show loading
+            exerciseResults.innerHTML = '<div class="text-center py-3"><p class="text-muted">Loading exercises...</p></div>';
+            
+            // Build query string
+            let queryParams = [];
+            if (search) queryParams.push(`search=${encodeURIComponent(search)}`);
+            if (muscle) queryParams.push(`muscle_group=${encodeURIComponent(muscle)}`);
+            if (difficulty) queryParams.push(`difficulty=${encodeURIComponent(difficulty)}`);
+            
+            // Fetch exercises from API
+            fetch(`/api/workouts/exercises?${queryParams.join('&')}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.exercises.length > 0) {
+                        // Display exercise results
+                        exerciseResults.innerHTML = '';
+                        data.exercises.forEach(exercise => {
+                            const exerciseHtml = `
+                                <a href="#" class="list-group-item list-group-item-action exercise-result" 
+                                   data-exercise-id="${exercise._id}" 
+                                   data-exercise-name="${exercise.name}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>${exercise.name}</strong>
+                                            <div>
+                                                <span class="badge badge-primary">${exercise.muscle_group}</span>
+                                                <span class="badge ${exercise.difficulty === 'beginner' ? 'badge-success' : exercise.difficulty === 'intermediate' ? 'badge-warning' : 'badge-danger'}">${exercise.difficulty}</span>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-plus-circle"></i>
+                                    </div>
+                                </a>
+                            `;
+                            exerciseResults.insertAdjacentHTML('beforeend', exerciseHtml);
+                        });
+                        
+                        // Add click handler for exercise selection
+                        const exerciseItems = exerciseResults.querySelectorAll('.exercise-result');
+                        exerciseItems.forEach(item => {
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                selectExercise(this.dataset.exerciseId, this.dataset.exerciseName);
+                            });
+                        });
+                    } else {
+                        // No results
+                        exerciseResults.innerHTML = '<div class="text-center py-3"><p class="text-muted">No exercises found. Try different search criteria.</p></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching exercises:', error);
+                    exerciseResults.innerHTML = '<div class="text-center py-3"><p class="text-danger">Error loading exercises. Please try again.</p></div>';
+                });
+        }
+        
+        function selectExercise(exerciseId, exerciseName) {
+            // Update selected exercise
+            selectedExerciseId.value = exerciseId;
+            selectedExerciseName.textContent = exerciseName;
+            
+            // Reset exercise form
+            document.getElementById('exercise-sets').value = 3;
+            document.getElementById('exercise-reps').value = '10';
+            document.getElementById('exercise-weight').value = '';
+            document.getElementById('exercise-notes').value = '';
+            
+            // Show exercise details
+            exerciseDetails.style.display = 'block';
+            
+            // Enable add button
+            addExerciseBtn.disabled = false;
+            
+            // Highlight selected exercise
+            const exerciseItems = exerciseResults.querySelectorAll('.exercise-result');
+            exerciseItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.exerciseId === exerciseId) {
+                    item.classList.add('active');
+                }
+            });
+        }
+        
+        function addExerciseToWorkout() {
+            const exerciseId = selectedExerciseId.value;
+            const exerciseName = selectedExerciseName.textContent;
+            const sets = document.getElementById('exercise-sets').value;
+            const reps = document.getElementById('exercise-reps').value;
+            const weight = document.getElementById('exercise-weight').value;
+            const notes = document.getElementById('exercise-notes').value;
+            
+            // Find the exercises container for the current day
+            const exercisesContainer = document.querySelector(`.exercises-container[data-day-index="${currentDayIndex}"]`);
+            
+            // Get the current number of exercises in this day
+            const exerciseIndex = exercisesContainer.querySelectorAll('.exercise-item').length;
+            
+            // Create exercise HTML
+            const exerciseHtml = `
+                <div class="exercise-item mb-2 border-bottom pb-2">
+                    <div class="d-flex justify-content-between">
+                        <input type="hidden" name="days[${currentDayIndex}][exercises][${exerciseIndex}][exercise_id]" value="${exerciseId}">
+                        <input type="hidden" name="days[${currentDayIndex}][exercises][${exerciseIndex}][sets]" value="${sets}">
+                        <input type="hidden" name="days[${currentDayIndex}][exercises][${exerciseIndex}][reps]" value="${reps}">
+                        <input type="hidden" name="days[${currentDayIndex}][exercises][${exerciseIndex}][weight]" value="${weight}">
+                        <input type="hidden" name="days[${currentDayIndex}][exercises][${exerciseIndex}][notes]" value="${notes}">
+                        <div class="exercise-info">
+                            <strong>${exerciseName}</strong>
+                            <div>
+                                <small class="text-muted">
+                                    ${sets} sets × ${reps} reps
+                                    ${weight ? `@ ${weight}` : ''}
+                                </small>
+                            </div>
+                            ${notes ? `<small class="text-muted d-block">${notes}</small>` : ''}
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-secondary edit-exercise">Edit</button>
+                            <button type="button" class="btn btn-sm btn-danger remove-exercise">Remove</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add exercise to the container
+            exercisesContainer.insertAdjacentHTML('beforeend', exerciseHtml);
+            
+            // Close the modal
+            bootstrap.Modal.getInstance(document.getElementById('exerciseModal')).hide();
+        }
+    });
+    
+    // Form submission validation
+    document.getElementById('templateForm').addEventListener('submit', function(e) {
+        const daysContainer = document.getElementById('days-container');
+        const dayCards = daysContainer.querySelectorAll('.day-card');
+        
+        if (dayCards.length === 0) {
+            e.preventDefault();
+            alert('Please add at least one workout day to the template');
+            return;
+        }
+        
+        // Check if each day has a name
+        let isValid = true;
+        dayCards.forEach((card, index) => {
+            const dayName = card.querySelector('.day-name').value.trim();
+            if (!dayName) {
+                isValid = false;
+                alert(`Please provide a name for Day ${index + 1}`);
+            }
+            
+            // Check if day has exercises
+            const exercises = card.querySelectorAll('.exercise-item');
+            if (exercises.length === 0) {
+                isValid = false;
+                alert(`Please add at least one exercise to Day ${index + 1}`);
+            }
+        });
+        
+        if (!isValid) {
+            e.preventDefault();
+        }
+    });
+    
+    {% if template %}
+    function confirmDelete(templateId) {
+        if (confirm('Are you sure you want to delete this workout template? This action cannot be undone.')) {
+            window.location.href = "{{ url_for('admin.delete_workout_template', template_id='PLACEHOLDER') }}".replace('PLACEHOLDER', templateId);
+        }
+    }
+    {% endif %}
+</script>
+{% endblock %}

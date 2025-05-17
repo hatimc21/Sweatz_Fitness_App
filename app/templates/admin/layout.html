@@ -487,10 +487,11 @@
                 <i class="fas fa-dumbbell"></i>
                 <span>Exercises</span>
             </a>
-            <a href="#" class="sidebar-menu-item {% if active_tab == 'workouts' %}active{% endif %}">
-                <i class="fas fa-running"></i>
-                <span>Workouts</span>
-            </a>
+            <!-- Add this to the sidebar menu in app/templates/admin/layout.html -->
+<a href="{{ url_for('admin.workout_templates') }}" class="sidebar-menu-item {% if active_tab == 'workouts' %}active{% endif %}">
+    <i class="fas fa-running"></i>
+    <span>Workout Templates</span>
+</a>
             <a href="#" class="sidebar-menu-item {% if active_tab == 'nutrition' %}active{% endif %}">
                 <i class="fas fa-apple-alt"></i>
                 <span>Nutrition</span>

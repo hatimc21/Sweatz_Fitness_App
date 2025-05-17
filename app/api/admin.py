@@ -9,6 +9,7 @@ import pymongo
 import json
 import csv
 from io import StringIO
+import re  # For regex pattern matching when processing form data
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -585,3 +586,164 @@ def user_stats_api():
     except Exception as e:
         current_app.logger.error(f"Error fetching user stats: {str(e)}")
         return jsonify({'error': 'Error fetching user stats'}), 500
+    
+# Add to app/api/admin.py
+
+# Workout Templates Management
+@admin_bp.route('/workout-templates')
+@login_required
+@admin_required
+def workout_templates():
+    page = int(request.args.get('page', 1))
+    per_page = 10
+    skip = (page - 1) * per_page
+    
+    # Get total count for pagination
+    total_templates = mongo.db.workout_routines.count_documents({})
+    total_pages = (total_templates + per_page - 1) // per_page
+    
+    # Get templates with pagination
+    templates = list(mongo.db.workout_routines.find().sort('created_at', pymongo.DESCENDING)
+                    .skip(skip).limit(per_page))
+    
+    # Convert ObjectId to string for serialization
+    for template in templates:
+        template['_id'] = str(template['_id'])
+    
+    return render_template('admin/workout_templates.html', 
+                           templates=templates,
+                           page=page,
+                           total_pages=total_pages,
+                           total_templates=total_templates,
+                           active_tab='workouts')
+
+@admin_bp.route('/workout-templates/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def add_workout_template():
+    if request.method == 'POST':
+        try:
+            # Get form data
+            data = request.form.to_dict()
+            
+            # Process workout days
+            days = []
+            days_data = request.form.getlist('days[]')
+            
+            # Process form data to extract days and exercises
+            # Note: This is a simplified version, actual implementation
+            # would need to handle complex nested form data
+            
+            # Build template data
+            template_data = {
+                'name': data.get('name'),
+                'description': data.get('description', ''),
+                'type': data.get('type', 'custom'),
+                'is_public': data.get('is_public') == 'true',
+                'tags': data.get('tags', '').split(',') if data.get('tags') else [],
+                'days': days,  # Placeholder - needs actual implementation
+                'created_by': str(current_user.id),
+                'created_at': datetime.utcnow()
+            }
+            
+            # Insert template
+            result = mongo.db.workout_routines.insert_one(template_data)
+            
+            if result.inserted_id:
+                flash('Workout template created successfully', 'success')
+                return redirect(url_for('admin.workout_templates'))
+            else:
+                flash('Error creating template', 'danger')
+        except Exception as e:
+            current_app.logger.error(f"Error creating workout template: {str(e)}")
+            flash('Error creating workout template', 'danger')
+        
+        return redirect(url_for('admin.add_workout_template'))
+    
+    # GET request - show form
+    # Get all muscle groups for the exercise filter
+    muscle_groups = mongo.db.exercises.distinct('muscle_group')
+    
+    return render_template('admin/workout_template_form.html', 
+                           template=None,
+                           muscle_groups=muscle_groups,
+                           active_tab='workouts')
+
+@admin_bp.route('/workout-templates/edit/<template_id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_workout_template(template_id):
+    try:
+        template = mongo.db.workout_routines.find_one({'_id': ObjectId(template_id)})
+        if not template:
+            flash('Workout template not found', 'warning')
+            return redirect(url_for('admin.workout_templates'))
+        
+        if request.method == 'POST':
+            # Get form data
+            data = request.form.to_dict()
+            
+            # Process workout days
+            days = []
+            # Process form data to extract days and exercises
+            # Note: This is a simplified version, actual implementation
+            # would need to handle complex nested form data
+            
+            # Build update data
+            update_data = {
+                'name': data.get('name'),
+                'description': data.get('description', ''),
+                'type': data.get('type', 'custom'),
+                'is_public': data.get('is_public') == 'true',
+                'tags': data.get('tags', '').split(',') if data.get('tags') else [],
+                'days': days,  # Placeholder - needs actual implementation
+                'updated_by': str(current_user.id),
+                'updated_at': datetime.utcnow()
+            }
+            
+            # Update template
+            result = mongo.db.workout_routines.update_one(
+                {'_id': ObjectId(template_id)},
+                {'$set': update_data}
+            )
+            
+            if result.modified_count > 0:
+                flash('Workout template updated successfully', 'success')
+            else:
+                flash('No changes were made', 'info')
+            
+            return redirect(url_for('admin.workout_templates'))
+        
+        # Convert ObjectId to string for template
+        template['_id'] = str(template['_id'])
+        
+        # Get all muscle groups for the exercise filter
+        muscle_groups = mongo.db.exercises.distinct('muscle_group')
+        
+        # GET request - show form
+        return render_template('admin/workout_template_form.html', 
+                              template=template,
+                              muscle_groups=muscle_groups,
+                              active_tab='workouts')
+    except Exception as e:
+        current_app.logger.error(f"Error editing workout template: {str(e)}")
+        flash('Error editing workout template', 'danger')
+        return redirect(url_for('admin.workout_templates'))
+
+@admin_bp.route('/workout-templates/delete/<template_id>')
+@login_required
+@admin_required
+def delete_workout_template(template_id):
+    try:
+        result = mongo.db.workout_routines.delete_one({'_id': ObjectId(template_id)})
+        
+        if result.deleted_count > 0:
+            flash('Workout template deleted successfully', 'success')
+        else:
+            flash('Workout template not found', 'warning')
+        
+        return redirect(url_for('admin.workout_templates'))
+    except Exception as e:
+        current_app.logger.error(f"Error deleting workout template: {str(e)}")
+        flash('Error deleting workout template', 'danger')
+        return redirect(url_for('admin.workout_templates'))

@@ -4,63 +4,32 @@
 
 {% block page_title %}Manage Exercises{% endblock %}
 
-{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Manage Exercises</h2>
-    <a href="{{ url_for('admin.add_exercise_route') }}" class="btn btn-success">Add New Exercise</a>
-</div>
-
-<!-- Search and Filter -->
-<div class="row mb-3">
-    <div class="col-md-6">
-        <form action="{{ url_for('admin.exercises') }}" method="GET" class="d-flex">
-            <input type="text" name="search" class="form-control" placeholder="Search exercises..." value="{{ request.args.get('search', '') }}">
-            <button type="submit" class="btn btn-primary ms-2">Search</button>
-        </form>
-    </div>
-    <div class="col-md-6 d-flex justify-content-end">
-        <select name="muscle_group" id="muscleGroupFilter" class="form-select me-2" style="width: auto;">
+{% block actions %}
+<div>
+    <a href="{{ url_for('admin.add_exercise_route') }}" class="btn btn-primary">Add New Exercise</a>
+    
+    <form action="{{ url_for('admin.exercises') }}" method="GET" style="display: inline-block; margin-left: 10px;">
+        <select name="muscle_group" class="form-control" style="display: inline-block; width: auto;">
             <option value="">All Muscle Groups</option>
             {% for group in muscle_groups %}
             <option value="{{ group }}" {% if request.args.get('muscle_group') == group %}selected{% endif %}>{{ group }}</option>
             {% endfor %}
         </select>
         
-        <select name="difficulty" id="difficultyFilter" class="form-select me-2" style="width: auto;">
-            <option value="">All Difficulties</option>
-            <option value="beginner" {% if request.args.get('difficulty') == 'beginner' %}selected{% endif %}>Beginner</option>
-            <option value="intermediate" {% if request.args.get('difficulty') == 'intermediate' %}selected{% endif %}>Intermediate</option>
-            <option value="advanced" {% if request.args.get('difficulty') == 'advanced' %}selected{% endif %}>Advanced</option>
-        </select>
-        
-        <select name="equipment" id="equipmentFilter" class="form-select me-2" style="width: auto;">
-            <option value="">All Equipment</option>
-            {% for equip in equipment_list %}
-            <option value="{{ equip }}" {% if request.args.get('equipment') == equip %}selected{% endif %}>{{ equip|title }}</option>
-            {% endfor %}
-        </select>
-        
-        <button id="filterBtn" class="btn btn-success me-2">Filter</button>
-        <a href="{{ url_for('admin.exercises') }}" class="btn btn-secondary">Reset</a>
-    </div>
+        <button type="submit" class="btn btn-primary" style="margin-left: 5px;">Filter</button>
+    </form>
 </div>
+{% endblock %}
 
-<!-- Exercise List -->
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <span>Exercises ({{ total_exercises }})</span>
-        <div>
-            <button id="deleteSelectedBtn" class="btn btn-danger me-2" disabled>Delete Selected</button>
-            <a href="{{ url_for('admin.export_exercises') }}" class="btn btn-primary">Export CSV</a>
-        </div>
     </div>
-    <div class="table-responsive">
-        <table class="table table-hover">
+    <div class="table-container">
+        <table class="table">
             <thead>
                 <tr>
-                    <th width="40px">
-                        <input type="checkbox" id="selectAllExercises" class="form-check-input">
-                    </th>
                     <th>Name</th>
                     <th>Muscle Group</th>
                     <th>Difficulty</th>
@@ -71,470 +40,62 @@
             <tbody>
                 {% for exercise in exercises %}
                 <tr>
-                    <td>
-                        <input type="checkbox" class="exercise-select form-check-input" value="{{ exercise._id }}">
-                    </td>
                     <td>{{ exercise.name }}</td>
-                    <td>{{ exercise.muscle_group }}</td>
+                    <td>
+                        <span class="badge badge-primary">{{ exercise.muscle_group }}</span>
+                    </td>
                     <td>
                         {% if exercise.difficulty == 'beginner' %}
-                        <span class="badge bg-success">Beginner</span>
+                        <span class="badge badge-success">Beginner</span>
                         {% elif exercise.difficulty == 'intermediate' %}
-                        <span class="badge bg-warning text-dark">Intermediate</span>
+                        <span class="badge badge-warning">Intermediate</span>
                         {% elif exercise.difficulty == 'advanced' %}
-                        <span class="badge bg-danger">Advanced</span>
+                        <span class="badge badge-danger">Advanced</span>
                         {% else %}
-                        <span class="badge bg-secondary">{{ exercise.difficulty }}</span>
+                        <span class="badge badge-secondary">{{ exercise.difficulty }}</span>
                         {% endif %}
                     </td>
                     <td>
-                        {% for item in exercise.equipment %}
-                        <span class="badge bg-info text-dark me-1">{{ item }}</span>
-                        {% endfor %}
+                        {% if exercise.equipment %}
+                            {% for item in exercise.equipment[:2] %}
+                                <span class="badge badge-secondary">{{ item }}</span>
+                            {% endfor %}
+                            {% if exercise.equipment|length > 2 %}
+                                <span class="badge badge-secondary">+{{ exercise.equipment|length - 2 }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">None</span>
+                        {% endif %}
                     </td>
                     <td>
-                        <a href="{{ url_for('admin.edit_exercise', exercise_id=exercise._id) }}" class="btn btn-sm btn-success me-1">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <button type="button" class="btn btn-sm btn-primary me-1 view-exercise-btn" data-exercise-id="{{ exercise._id }}">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-danger delete-exercise-btn" data-exercise-id="{{ exercise._id }}">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <a href="{{ url_for('admin.edit_exercise', exercise_id=exercise._id) }}" class="btn btn-sm btn-primary" style="padding: 3px 8px; font-size: 0.8rem;">Edit</a>
+                        <a href="#" onclick="confirmDelete('{{ exercise._id }}'); return false;" class="btn btn-sm btn-danger" style="padding: 3px 8px; font-size: 0.8rem;">Delete</a>
                     </td>
                 </tr>
                 {% endfor %}
-                
-                {% if exercises|length == 0 %}
-                <tr>
-                    <td colspan="6" class="text-center py-3">
-                        {% if request.args %}
-                        <p class="mb-0">No exercises match your filter criteria. <a href="{{ url_for('admin.exercises') }}">Clear filters</a></p>
-                        {% else %}
-                        <p class="mb-0">No exercises have been added yet.</p>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endif %}
             </tbody>
         </table>
     </div>
+    
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% for i in range(1, total_pages + 1) %}
+        <a href="{{ url_for('admin.exercises', page=i, muscle_group=request.args.get('muscle_group')) }}" 
+           class="{% if i == page %}active{% endif %}">
+            {{ i }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
-
-<!-- Exercise Details Section (Right Panel) -->
-<div id="exerciseDetailsPanel" class="exercise-details-panel">
-    <h5 class="mb-3">Exercise Details</h5>
-    <div id="exerciseDetailsLoading" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="mt-2">Loading...</p>
-    </div>
-    
-    <div id="exerciseDetailsContent" class="d-none">
-        <p>Loading...</p>
-        <div class="mb-3">
-            <p><strong>Muscle Group:</strong> <span id="detailMuscleGroup"></span></p>
-            <p><strong>Difficulty:</strong> <span id="detailDifficulty"></span></p>
-            <p><strong>Equipment:</strong> <span id="detailEquipment"></span></p>
-            <p><strong>Created:</strong> <span id="detailCreated"></span></p>
-            <p><strong>Created By:</strong> <span id="detailCreatedBy"></span></p>
-            <p><strong>Last Updated:</strong> <span id="detailLastUpdated"></span></p>
-        </div>
-        
-        <div class="mb-3">
-            <h6>Description</h6>
-            <p id="detailDescription"></p>
-        </div>
-        
-        <div class="mb-3">
-            <h6>Instructions</h6>
-            <div id="detailInstructions"></div>
-        </div>
-        
-        <div class="mb-3">
-            <h6>Video Demonstration</h6>
-            <div id="detailVideoDemo"></div>
-        </div>
-        
-        <div class="mt-4">
-            <button class="btn btn-primary me-2" id="editExerciseBtn">Edit Exercise</button>
-            <button class="btn btn-secondary" id="closeDetailsBtn">Close</button>
-        </div>
-    </div>
-    
-    <!-- Confirm Deletion Section -->
-    <div id="confirmDeletionSection" class="d-none">
-        <h5 class="mb-3">Confirm Deletion</h5>
-        <p>Are you sure you want to delete this exercise? This action cannot be undone.</p>
-        <p><strong>Exercise:</strong> <span id="deleteExerciseName"></span></p>
-        
-        <div class="mt-4">
-            <button class="btn btn-danger me-2" id="confirmDeleteBtn">Delete Exercise</button>
-            <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
-        </div>
-    </div>
-    
-    <!-- Confirm Bulk Deletion Section -->
-    <div id="confirmBulkDeletionSection" class="d-none">
-        <h5 class="mb-3">Confirm Bulk Deletion</h5>
-        <p>Are you sure you want to delete the selected exercises? This action cannot be undone.</p>
-        <p><strong>Selected exercises:</strong> <span id="selectedExercisesCount">0</span></p>
-        
-        <div class="mt-4">
-            <button class="btn btn-danger me-2" id="confirmBulkDeleteBtn">Delete Exercises</button>
-            <button class="btn btn-secondary" id="cancelBulkDeleteBtn">Cancel</button>
-        </div>
-    </div>
-</div>
-
-{% endblock %}
-
-{% block styles %}
-<style>
-.exercise-details-panel {
-    position: fixed;
-    right: -400px;
-    top: 0;
-    width: 400px;
-    height: 100vh;
-    background-color: white;
-    border-left: 1px solid #ddd;
-    padding: 20px;
-    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-    overflow-y: auto;
-    transition: right 0.3s ease;
-    z-index: 1000;
-}
-
-.exercise-details-panel.active {
-    right: 0;
-}
-
-.panel-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-    display: none;
-}
-
-.panel-overlay.active {
-    display: block;
-}
-</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Panel functionality
-    const detailsPanel = document.getElementById('exerciseDetailsPanel');
-    const overlay = document.createElement('div');
-    overlay.className = 'panel-overlay';
-    document.body.appendChild(overlay);
-    
-    function openPanel() {
-        detailsPanel.classList.add('active');
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-    
-    function closePanel() {
-        detailsPanel.classList.remove('active');
-        overlay.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-    
-    // Close panel when clicking on overlay
-    overlay.addEventListener('click', closePanel);
-    
-    // Close panel button
-    document.getElementById('closeDetailsBtn').addEventListener('click', closePanel);
-    
-    // Exercise details view
-    const viewBtns = document.querySelectorAll('.view-exercise-btn');
-    viewBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const exerciseId = this.getAttribute('data-exercise-id');
-            showExerciseDetails(exerciseId);
-        });
-    });
-    
-    // Delete exercise buttons
-    const deleteBtns = document.querySelectorAll('.delete-exercise-btn');
-    let currentExerciseId = null;
-    
-    deleteBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            currentExerciseId = this.getAttribute('data-exercise-id');
-            const exerciseName = this.closest('tr').querySelector('td:nth-child(2)').textContent;
-            
-            // Hide exercise details and show deletion confirmation
-            document.getElementById('exerciseDetailsContent').classList.add('d-none');
-            document.getElementById('exerciseDetailsLoading').classList.add('d-none');
-            document.getElementById('confirmDeletionSection').classList.remove('d-none');
-            document.getElementById('confirmBulkDeletionSection').classList.add('d-none');
-            
-            document.getElementById('deleteExerciseName').textContent = exerciseName;
-            openPanel();
-        });
-    });
-    
-    // Confirm delete button
-    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-        if (currentExerciseId) {
-            deleteExercise(currentExerciseId);
-        }
-    });
-    
-    // Cancel delete button
-    document.getElementById('cancelDeleteBtn').addEventListener('click', closePanel);
-    
-    // Select all exercises checkbox
-    const selectAllCheckbox = document.getElementById('selectAllExercises');
-    const exerciseCheckboxes = document.querySelectorAll('.exercise-select');
-    
-    selectAllCheckbox.addEventListener('change', function() {
-        const isChecked = this.checked;
-        exerciseCheckboxes.forEach(checkbox => {
-            checkbox.checked = isChecked;
-        });
-        updateDeleteSelectedButton();
-    });
-    
-    // Individual checkboxes
-    exerciseCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateDeleteSelectedButton);
-    });
-    
-    // Delete selected button
-    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
-    deleteSelectedBtn.addEventListener('click', function() {
-        const selectedExercises = getSelectedExercises();
-        
-        // Show bulk deletion confirmation
-        document.getElementById('exerciseDetailsContent').classList.add('d-none');
-        document.getElementById('exerciseDetailsLoading').classList.add('d-none');
-        document.getElementById('confirmDeletionSection').classList.add('d-none');
-        document.getElementById('confirmBulkDeletionSection').classList.remove('d-none');
-        
-        document.getElementById('selectedExercisesCount').textContent = selectedExercises.length;
-        openPanel();
-    });
-    
-    // Confirm bulk delete button
-    document.getElementById('confirmBulkDeleteBtn').addEventListener('click', function() {
-        const selectedExercises = getSelectedExercises();
-        if (selectedExercises.length > 0) {
-            bulkDeleteExercises(selectedExercises);
-        }
-    });
-    
-    // Cancel bulk delete button
-    document.getElementById('cancelBulkDeleteBtn').addEventListener('click', closePanel);
-    
-    // Filter form submission
-    document.getElementById('filterBtn').addEventListener('click', function() {
-        const muscleGroup = document.getElementById('muscleGroupFilter').value;
-        const difficulty = document.getElementById('difficultyFilter').value;
-        const equipment = document.getElementById('equipmentFilter').value;
-        
-        let url = '{{ url_for('admin.exercises') }}?';
-        if (muscleGroup) url += `muscle_group=${encodeURIComponent(muscleGroup)}&`;
-        if (difficulty) url += `difficulty=${encodeURIComponent(difficulty)}&`;
-        if (equipment) url += `equipment=${encodeURIComponent(equipment)}&`;
-        
-        window.location.href = url;
-    });
-    
-    // Functions
-    function showExerciseDetails(exerciseId) {
-        // Reset panel content
-        document.getElementById('exerciseDetailsContent').classList.add('d-none');
-        document.getElementById('exerciseDetailsLoading').classList.remove('d-none');
-        document.getElementById('confirmDeletionSection').classList.add('d-none');
-        document.getElementById('confirmBulkDeletionSection').classList.add('d-none');
-        
-        openPanel();
-        
-        // Fetch exercise details
-        fetch(`/admin/api/exercises/${exerciseId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    populateExerciseDetails(data.exercise);
-                } else {
-                    alert('Error loading exercise details: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching exercise details:', error);
-                alert('Error loading exercise details. Please try again.');
-            })
-            .finally(() => {
-                document.getElementById('exerciseDetailsLoading').classList.add('d-none');
-                document.getElementById('exerciseDetailsContent').classList.remove('d-none');
-            });
-            
-        // Update edit button
-        document.getElementById('editExerciseBtn').onclick = function() {
-            window.location.href = `/admin/exercises/edit/${exerciseId}`;
-        };
-    }
-    
-    function populateExerciseDetails(exercise) {
-        // Set title (hidden in the design, but keep it for potential future use)
-        const title = document.querySelector('#exerciseDetailsContent h5');
-        if (title) title.textContent = exercise.name;
-        
-        // Set basic info
-        document.getElementById('detailMuscleGroup').textContent = exercise.muscle_group || 'Not specified';
-        document.getElementById('detailDifficulty').textContent = exercise.difficulty ? exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1) : 'Not specified';
-        
-        // Set equipment
-        const equipmentEl = document.getElementById('detailEquipment');
-        equipmentEl.innerHTML = '';
-        if (exercise.equipment && exercise.equipment.length > 0) {
-            exercise.equipment.forEach(item => {
-                const badge = document.createElement('span');
-                badge.className = 'badge bg-info text-dark me-1';
-                badge.textContent = item;
-                equipmentEl.appendChild(badge);
-            });
-        } else {
-            equipmentEl.textContent = 'None specified';
-        }
-        
-        // Set creation info
-        document.getElementById('detailCreated').textContent = exercise.created_at ? new Date(exercise.created_at).toLocaleString() : 'Unknown';
-        document.getElementById('detailCreatedBy').textContent = exercise.created_by_username || 'System';
-        document.getElementById('detailLastUpdated').textContent = exercise.updated_at ? new Date(exercise.updated_at).toLocaleString() : 'Never';
-        
-        // Set description
-        document.getElementById('detailDescription').textContent = exercise.description || 'No description provided.';
-        
-        // Set instructions
-        const instructionsDiv = document.getElementById('detailInstructions');
-        instructionsDiv.innerHTML = '';
-        if (exercise.instruction) {
-            const instructionsList = exercise.instruction.split('\n');
-            const ol = document.createElement('ol');
-            instructionsList.forEach(instruction => {
-                if (instruction.trim()) {
-                    const li = document.createElement('li');
-                    li.textContent = instruction.trim();
-                    ol.appendChild(li);
-                }
-            });
-            instructionsDiv.appendChild(ol);
-        } else {
-            instructionsDiv.textContent = 'No instructions provided.';
-        }
-        
-        // Set video
-        const videoDemo = document.getElementById('detailVideoDemo');
-        videoDemo.innerHTML = '';
-        if (exercise.video_url) {
-            // Check if it's a YouTube URL
-            if (exercise.video_url.includes('youtube.com') || exercise.video_url.includes('youtu.be')) {
-                // Extract video ID
-                let videoId = '';
-                if (exercise.video_url.includes('v=')) {
-                    videoId = exercise.video_url.split('v=')[1].split('&')[0];
-                } else if (exercise.video_url.includes('youtu.be/')) {
-                    videoId = exercise.video_url.split('youtu.be/')[1];
-                }
-                
-                if (videoId) {
-                    const iframe = document.createElement('iframe');
-                    iframe.src = `https://www.youtube.com/embed/${videoId}`;
-                    iframe.width = '100%';
-                    iframe.height = '200';
-                    iframe.title = "YouTube video player";
-                    iframe.frameBorder = "0";
-                    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-                    iframe.allowFullscreen = true;
-                    videoDemo.appendChild(iframe);
-                } else {
-                    videoDemo.innerHTML = `<div class="alert alert-info">Video available at: <a href="${exercise.video_url}" target="_blank">${exercise.video_url}</a></div>`;
-                }
-            } else {
-                videoDemo.innerHTML = `<div class="alert alert-info">Video available at: <a href="${exercise.video_url}" target="_blank">${exercise.video_url}</a></div>`;
-            }
-        } else {
-            videoDemo.innerHTML = '<div class="alert alert-secondary">No video demonstration available.</div>';
+    function confirmDelete(exerciseId) {
+        if (confirm('Are you sure you want to delete this exercise? This action cannot be undone.')) {
+            window.location.href = "{{ url_for('admin.delete_exercise', exercise_id='PLACEHOLDER') }}".replace('PLACEHOLDER', exerciseId);
         }
     }
-    
-    function deleteExercise(exerciseId) {
-        fetch(`/admin/api/exercises/${exerciseId}`, {
-            method: 'DELETE',
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                closePanel();
-                window.location.reload();
-            } else {
-                alert('Error deleting exercise: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting exercise:', error);
-            alert('Error deleting exercise. Please try again.');
-        });
-    }
-    
-    function updateDeleteSelectedButton() {
-        const selectedExercises = getSelectedExercises();
-        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
-        
-        if (selectedExercises.length > 0) {
-            deleteSelectedBtn.disabled = false;
-            deleteSelectedBtn.textContent = `Delete Selected (${selectedExercises.length})`;
-        } else {
-            deleteSelectedBtn.disabled = true;
-            deleteSelectedBtn.textContent = 'Delete Selected';
-        }
-    }
-    
-    function getSelectedExercises() {
-        const selectedExercises = [];
-        document.querySelectorAll('.exercise-select:checked').forEach(checkbox => {
-            selectedExercises.push(checkbox.value);
-        });
-        return selectedExercises;
-    }
-    
-    function bulkDeleteExercises(exerciseIds) {
-        fetch('/admin/api/exercises/bulk-delete', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                exercise_ids: exerciseIds
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                closePanel();
-                window.location.reload();
-            } else {
-                alert('Error deleting exercises: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error bulk deleting exercises:', error);
-            alert('Error deleting exercises. Please try again.');
-        });
-    }
-});
 </script>
 {% endblock %}
