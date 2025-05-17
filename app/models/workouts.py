@@ -5,6 +5,74 @@ from app import mongo
 
 class Workout:
     @staticmethod
+    def create_exercise(exercise_data):
+        """Create a new exercise in the database"""
+        exercise = {
+            "name": exercise_data.get("name"),
+            "muscle_group": exercise_data.get("muscle_group", "other"),
+            "difficulty": exercise_data.get("difficulty", "intermediate"),
+            "description": exercise_data.get("description", ""),
+            "instruction": exercise_data.get("instruction", ""),
+            "video_url": exercise_data.get("video_url", ""),
+            "equipment": exercise_data.get("equipment", []),
+            "created_by": exercise_data.get("created_by"),  # Admin ID
+            "created_at": datetime.now()
+        }
+        
+        result = mongo.db.exercises.insert_one(exercise)
+        return str(result.inserted_id)
+    
+    @staticmethod
+    def get_exercises(filters=None, limit=100, skip=0):
+        """Get exercises with optional filters"""
+        query = {}
+        
+        if filters:
+            if 'muscle_group' in filters:
+                query['muscle_group'] = filters['muscle_group']
+            if 'difficulty' in filters:
+                query['difficulty'] = filters['difficulty']
+            if 'equipment' in filters and filters['equipment']:
+                query['equipment'] = {'$in': filters['equipment']}
+            if 'search' in filters and filters['search']:
+                query['name'] = {'$regex': filters['search'], '$options': 'i'}
+        
+        exercises = mongo.db.exercises.find(query).sort("name", 1).skip(skip).limit(limit)
+        total = mongo.db.exercises.count_documents(query)
+        
+        return list(exercises), total
+    
+    @staticmethod
+    def get_exercise(exercise_id):
+        """Get a specific exercise by ID"""
+        return mongo.db.exercises.find_one({"_id": ObjectId(exercise_id)})
+    
+    @staticmethod
+    def update_exercise(exercise_id, exercise_data):
+        """Update an exercise"""
+        result = mongo.db.exercises.update_one(
+            {"_id": ObjectId(exercise_id)},
+            {"$set": {
+                "name": exercise_data.get("name"),
+                "muscle_group": exercise_data.get("muscle_group"),
+                "difficulty": exercise_data.get("difficulty"),
+                "description": exercise_data.get("description"),
+                "instruction": exercise_data.get("instruction"),
+                "video_url": exercise_data.get("video_url"),
+                "equipment": exercise_data.get("equipment"),
+                "updated_at": datetime.now(),
+                "updated_by": exercise_data.get("updated_by")
+            }}
+        )
+        return result.modified_count > 0
+    
+    @staticmethod
+    def delete_exercise(exercise_id):
+        """Delete an exercise"""
+        result = mongo.db.exercises.delete_one({"_id": ObjectId(exercise_id)})
+        return result.deleted_count > 0
+    
+    @staticmethod
     def create_routine(user_id, routine_data):
         """Create a workout routine"""
         routine = {
@@ -174,111 +242,3 @@ class Workout:
         ).sort("date", -1).limit(limit)
         
         return list(workouts)
-    
-    @staticmethod
-    def get_exercises(filters=None, limit=100, skip=0):
-        """Get exercises with optional filters"""
-        query = {}
-        
-        if filters:
-            if 'muscle_group' in filters:
-                query['muscle_group'] = filters['muscle_group']
-            if 'difficulty' in filters:
-                query['difficulty'] = filters['difficulty']
-            if 'equipment' in filters and filters['equipment']:
-                query['equipment'] = {'$in': filters['equipment']}
-            if 'search' in filters and filters['search']:
-                query['name'] = {'$regex': filters['search'], '$options': 'i'}
-        
-        exercises = mongo.db.exercises.find(query).sort("name", 1).skip(skip).limit(limit)
-        total = mongo.db.exercises.count_documents(query)
-        
-        return list(exercises), total
-    
-    @staticmethod
-    def get_exercise_categories():
-        """Get all exercise categories/muscle groups"""
-        return mongo.db.exercises.distinct("muscle_group")
-    
-    @staticmethod
-    def get_equipment_types():
-        """Get all equipment types"""
-        equipment = []
-        pipeline = [
-            {"$unwind": "$equipment"},
-            {"$group": {"_id": "$equipment"}},
-            {"$sort": {"_id": 1}}
-        ]
-        results = mongo.db.exercises.aggregate(pipeline)
-        
-        for result in results:
-            equipment.append(result["_id"])
-        
-        return equipment
-    
-    @staticmethod
-    def get_workout_stats(user_id, period="all"):
-        """Get workout statistics for a user"""
-        # Define the date range based on the period
-        match_query = {"user_id": ObjectId(user_id)}
-        
-        if period == "week":
-            # Last 7 days
-            start_date = datetime.now() - timedelta(days=7)
-            match_query["date"] = {"$gte": start_date}
-        elif period == "month":
-            # Last 30 days
-            start_date = datetime.now() - timedelta(days=30)
-            match_query["date"] = {"$gte": start_date}
-        elif period == "year":
-            # Last 365 days
-            start_date = datetime.now() - timedelta(days=365)
-            match_query["date"] = {"$gte": start_date}
-        
-        # Pipeline to get workout statistics
-        pipeline = [
-            {"$match": match_query},
-            {"$group": {
-                "_id": None,
-                "total_workouts": {"$sum": 1},
-                "total_duration": {"$sum": "$duration"},
-                "avg_rating": {"$avg": "$rating"}
-            }}
-        ]
-        
-        stats = list(mongo.db.completed_workouts.aggregate(pipeline))
-        
-        if stats:
-            stats = stats[0]
-            stats.pop("_id", None)  # Remove _id field
-        else:
-            stats = {
-                "total_workouts": 0,
-                "total_duration": 0,
-                "avg_rating": 0
-            }
-        
-        # Get most trained muscle groups
-        if period == "all":
-            muscle_group_pipeline = [
-                {"$match": {"user_id": ObjectId(user_id)}},
-                {"$unwind": "$exercises"},
-                {"$lookup": {
-                    "from": "exercises",
-                    "localField": "exercises.exercise_id",
-                    "foreignField": "_id",
-                    "as": "exercise_info"
-                }},
-                {"$unwind": "$exercise_info"},
-                {"$group": {
-                    "_id": "$exercise_info.muscle_group",
-                    "count": {"$sum": 1}
-                }},
-                {"$sort": {"count": -1}},
-                {"$limit": 5}
-            ]
-            
-            muscle_groups = list(mongo.db.completed_workouts.aggregate(muscle_group_pipeline))
-            stats["top_muscle_groups"] = muscle_groups
-        
-        return stats

@@ -1,11 +1,14 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, Response
 from flask_login import login_required, current_user
-from bson import ObjectId
+from bson import ObjectId, json_util
 from functools import wraps
 from app import mongo
 from datetime import datetime, timedelta
 from app.models.user import User
 import pymongo
+import json
+import csv
+from io import StringIO
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -170,8 +173,18 @@ def exercises():
     
     # Apply filters if provided
     filters = {}
+    
     if request.args.get('muscle_group'):
         filters['muscle_group'] = request.args.get('muscle_group')
+    
+    if request.args.get('difficulty'):
+        filters['difficulty'] = request.args.get('difficulty')
+    
+    if request.args.get('equipment'):
+        filters['equipment'] = request.args.get('equipment')
+    
+    if request.args.get('search'):
+        filters['name'] = {'$regex': request.args.get('search'), '$options': 'i'}
     
     # Get total count for pagination
     total_exercises = mongo.db.exercises.count_documents(filters)
@@ -188,15 +201,24 @@ def exercises():
     # Get all unique muscle groups for filtering
     muscle_groups = mongo.db.exercises.distinct('muscle_group')
     
+    # Get all unique equipment types for filtering
+    equipment_pipeline = [
+        {"$unwind": "$equipment"},
+        {"$group": {"_id": "$equipment"}},
+        {"$sort": {"_id": 1}}
+    ]
+    equipment_list = [item['_id'] for item in mongo.db.exercises.aggregate(equipment_pipeline)]
+    
     return render_template('admin/exercises.html', 
                            exercises=exercises_data,
                            muscle_groups=muscle_groups,
+                           equipment_list=equipment_list,
                            page=page,
                            total_pages=total_pages,
                            total_exercises=total_exercises,
                            active_tab='exercises')
 
-# Add exercise - RENAMED to avoid conflict
+# Add exercise
 @admin_bp.route('/exercises/add', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -206,6 +228,15 @@ def add_exercise_route():
             # Get form data
             data = request.form
             
+            # Process equipment - combine checkboxes and other equipment field
+            equipment = []
+            if 'equipment_json' in data and data['equipment_json']:
+                try:
+                    equipment = json.loads(data['equipment_json'])
+                except:
+                    # Fallback to processing checkboxes directly
+                    equipment = request.form.getlist('equipment')
+            
             # Prepare exercise data
             exercise_data = {
                 'name': data.get('name'),
@@ -214,7 +245,8 @@ def add_exercise_route():
                 'difficulty': data.get('difficulty'),
                 'instruction': data.get('instruction'),
                 'video_url': data.get('video_url'),
-                'equipment': data.get('equipment', '').split(',') if data.get('equipment') else [],
+                'equipment': equipment,
+                'tips': data.get('tips', ''),
                 'created_at': datetime.utcnow(),
                 'created_by': str(current_user.id)
             }
@@ -229,7 +261,7 @@ def add_exercise_route():
                 flash('Error adding exercise', 'danger')
         except Exception as e:
             current_app.logger.error(f"Error adding exercise: {str(e)}")
-            flash('Error adding exercise', 'danger')
+            flash(f'Error adding exercise: {str(e)}', 'danger')
         
         return redirect(url_for('admin.add_exercise_route'))
     
@@ -238,11 +270,232 @@ def add_exercise_route():
                            exercise=None,
                            active_tab='exercises')
 
+# Edit exercise
+@admin_bp.route('/exercises/edit/<exercise_id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_exercise(exercise_id):
+    try:
+        exercise = mongo.db.exercises.find_one({'_id': ObjectId(exercise_id)})
+        if not exercise:
+            flash('Exercise not found', 'warning')
+            return redirect(url_for('admin.exercises'))
+        
+        if request.method == 'POST':
+            # Get form data
+            data = request.form
+            
+            # Process equipment - combine checkboxes and other equipment field
+            equipment = []
+            if 'equipment_json' in data and data['equipment_json']:
+                try:
+                    equipment = json.loads(data['equipment_json'])
+                except:
+                    # Fallback to processing checkboxes directly
+                    equipment = request.form.getlist('equipment')
+            
+            # Prepare exercise data
+            update_data = {
+                'name': data.get('name'),
+                'description': data.get('description'),
+                'muscle_group': data.get('muscle_group'),
+                'difficulty': data.get('difficulty'),
+                'instruction': data.get('instruction'),
+                'video_url': data.get('video_url'),
+                'equipment': equipment,
+                'tips': data.get('tips', ''),
+                'updated_at': datetime.utcnow(),
+                'updated_by': str(current_user.id)
+            }
+            
+            # Update exercise
+            result = mongo.db.exercises.update_one(
+                {'_id': ObjectId(exercise_id)},
+                {'$set': update_data}
+            )
+            
+            if result.modified_count > 0:
+                flash('Exercise updated successfully', 'success')
+            else:
+                flash('No changes were made', 'info')
+            
+            return redirect(url_for('admin.exercises'))
+        
+        # Convert ObjectId to string for template
+        exercise['_id'] = str(exercise['_id'])
+        
+        # GET request - show form
+        return render_template('admin/exercise_form.html', 
+                              exercise=exercise,
+                              active_tab='exercises')
+    except Exception as e:
+        current_app.logger.error(f"Error editing exercise: {str(e)}")
+        flash(f'Error editing exercise: {str(e)}', 'danger')
+        return redirect(url_for('admin.exercises'))
+
+# Delete exercise
+@admin_bp.route('/exercises/delete/<exercise_id>')
+@login_required
+@admin_required
+def delete_exercise(exercise_id):
+    try:
+        result = mongo.db.exercises.delete_one({'_id': ObjectId(exercise_id)})
+        
+        if result.deleted_count > 0:
+            flash('Exercise deleted successfully', 'success')
+        else:
+            flash('Exercise not found', 'warning')
+        
+        return redirect(url_for('admin.exercises'))
+    except Exception as e:
+        current_app.logger.error(f"Error deleting exercise: {str(e)}")
+        flash(f'Error deleting exercise: {str(e)}', 'danger')
+        return redirect(url_for('admin.exercises'))
+
+# Export exercises
+@admin_bp.route('/exercises/export')
+@login_required
+@admin_required
+def export_exercises():
+    """Export exercises to CSV"""
+    try:
+        # Apply filters if provided
+        filters = {}
+        
+        if request.args.get('muscle_group'):
+            filters['muscle_group'] = request.args.get('muscle_group')
+        
+        if request.args.get('difficulty'):
+            filters['difficulty'] = request.args.get('difficulty')
+        
+        if request.args.get('equipment'):
+            filters['equipment'] = request.args.get('equipment')
+        
+        if request.args.get('search'):
+            filters['name'] = {'$regex': request.args.get('search'), '$options': 'i'}
+        
+        # Get all exercises matching the filters
+        exercises = list(mongo.db.exercises.find(filters).sort('name', pymongo.ASCENDING))
+        
+        # Create CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Write header row
+        writer.writerow(['ID', 'Name', 'Muscle Group', 'Difficulty', 'Equipment', 'Description', 'Instructions', 'Video URL', 'Created At'])
+        
+        # Write data rows
+        for exercise in exercises:
+            equipment_str = ', '.join(exercise.get('equipment', [])) if exercise.get('equipment') else ''
+            
+            writer.writerow([
+                str(exercise['_id']),
+                exercise.get('name', ''),
+                exercise.get('muscle_group', ''),
+                exercise.get('difficulty', ''),
+                equipment_str,
+                exercise.get('description', ''),
+                exercise.get('instruction', '').replace('\n', ' ') if exercise.get('instruction') else '',
+                exercise.get('video_url', ''),
+                exercise.get('created_at', '').strftime('%Y-%m-%d %H:%M:%S') if exercise.get('created_at') else ''
+            ])
+        
+        # Prepare response
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=sweatz_exercises.csv"}
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Error exporting exercises: {str(e)}")
+        flash(f"Error exporting exercises: {str(e)}", 'danger')
+        return redirect(url_for('admin.exercises'))
+
+# API endpoint to get exercise details
+@admin_bp.route('/api/exercises/<exercise_id>', methods=['GET'])
+@login_required
+@admin_required
+def get_exercise_api(exercise_id):
+    """API endpoint to get exercise details"""
+    try:
+        exercise = mongo.db.exercises.find_one({'_id': ObjectId(exercise_id)})
+        
+        if not exercise:
+            return jsonify({"error": "Exercise not found"}), 404
+        
+        # If the exercise has a created_by field, fetch the username
+        if 'created_by' in exercise:
+            try:
+                creator = mongo.db.users.find_one({'_id': ObjectId(exercise['created_by'])})
+                if creator:
+                    exercise['created_by_username'] = creator.get('username', 'Unknown')
+            except:
+                exercise['created_by_username'] = 'Unknown'
+        
+        return jsonify({
+            "success": True,
+            "exercise": json.loads(json_util.dumps(exercise))
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error fetching exercise: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+# API endpoint to delete an exercise
+@admin_bp.route('/api/exercises/<exercise_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_exercise_api(exercise_id):
+    """API endpoint to delete an exercise"""
+    try:
+        result = mongo.db.exercises.delete_one({'_id': ObjectId(exercise_id)})
+        
+        if result.deleted_count == 0:
+            return jsonify({"error": "Exercise not found"}), 404
+        
+        return jsonify({
+            "success": True,
+            "message": "Exercise deleted successfully"
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error deleting exercise: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
+# API endpoint to delete multiple exercises
+@admin_bp.route('/api/exercises/bulk-delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_exercises():
+    """API endpoint to delete multiple exercises"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'exercise_ids' not in data or not isinstance(data['exercise_ids'], list):
+            return jsonify({"error": "Invalid request data"}), 400
+        
+        # Convert string IDs to ObjectId
+        object_ids = [ObjectId(id) for id in data['exercise_ids']]
+        
+        result = mongo.db.exercises.delete_many({'_id': {'$in': object_ids}})
+        
+        return jsonify({
+            "success": True,
+            "message": f"{result.deleted_count} exercises deleted successfully"
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error bulk deleting exercises: {str(e)}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
 # System settings
 @admin_bp.route('/settings')
 @login_required
 @admin_required
 def settings():
+    """Render the system settings page"""
     # Get current settings
     settings_data = mongo.db.settings.find_one({'_id': 'app_settings'})
     if not settings_data:
@@ -266,6 +519,7 @@ def settings():
 @login_required
 @admin_required
 def update_settings():
+    """Update system settings"""
     try:
         # Get form data
         data = request.form
@@ -299,6 +553,7 @@ def update_settings():
 @login_required
 @admin_required
 def user_stats_api():
+    """API endpoint for user statistics chart data"""
     try:
         # Get user signups by date for the last 30 days
         days = 30
@@ -330,77 +585,3 @@ def user_stats_api():
     except Exception as e:
         current_app.logger.error(f"Error fetching user stats: {str(e)}")
         return jsonify({'error': 'Error fetching user stats'}), 500
-    
-# Add these routes to the existing admin_bp
-
-# Edit exercise
-@admin_bp.route('/exercises/edit/<exercise_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_exercise(exercise_id):
-    try:
-        exercise = mongo.db.exercises.find_one({'_id': ObjectId(exercise_id)})
-        if not exercise:
-            flash('Exercise not found', 'warning')
-            return redirect(url_for('admin.exercises'))
-        
-        if request.method == 'POST':
-            # Get form data
-            data = request.form
-            
-            # Prepare exercise data
-            update_data = {
-                'name': data.get('name'),
-                'description': data.get('description'),
-                'muscle_group': data.get('muscle_group'),
-                'difficulty': data.get('difficulty'),
-                'instruction': data.get('instruction'),
-                'video_url': data.get('video_url'),
-                'equipment': data.get('equipment', '').split(',') if data.get('equipment') else [],
-                'updated_at': datetime.utcnow(),
-                'updated_by': str(current_user.id)
-            }
-            
-            # Update exercise
-            result = mongo.db.exercises.update_one(
-                {'_id': ObjectId(exercise_id)},
-                {'$set': update_data}
-            )
-            
-            if result.modified_count > 0:
-                flash('Exercise updated successfully', 'success')
-            else:
-                flash('No changes were made', 'info')
-            
-            return redirect(url_for('admin.exercises'))
-        
-        # Convert ObjectId to string for template
-        exercise['_id'] = str(exercise['_id'])
-        
-        # GET request - show form
-        return render_template('admin/exercise_form.html', 
-                              exercise=exercise,
-                              active_tab='exercises')
-    except Exception as e:
-        current_app.logger.error(f"Error editing exercise: {str(e)}")
-        flash('Error editing exercise', 'danger')
-        return redirect(url_for('admin.exercises'))
-
-# Delete exercise
-@admin_bp.route('/exercises/delete/<exercise_id>')
-@login_required
-@admin_required
-def delete_exercise(exercise_id):
-    try:
-        result = mongo.db.exercises.delete_one({'_id': ObjectId(exercise_id)})
-        
-        if result.deleted_count > 0:
-            flash('Exercise deleted successfully', 'success')
-        else:
-            flash('Exercise not found', 'warning')
-        
-        return redirect(url_for('admin.exercises'))
-    except Exception as e:
-        current_app.logger.error(f"Error deleting exercise: {str(e)}")
-        flash('Error deleting exercise', 'danger')
-        return redirect(url_for('admin.exercises'))
